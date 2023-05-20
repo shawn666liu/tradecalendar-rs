@@ -239,20 +239,6 @@ pub trait TradingdayCache {
         return Err(anyhow!("out of range"));
     }
 
-    /// 获取后续第num个自然日(不一定是交易日)，要求num大于零
-    fn get_next_day(&self, the_day: &NaiveDate, num: usize) -> Result<&Tradingday> {
-        assert!(num > 0);
-        let list = self.get_full_day_list();
-        let (_, _, right) = search_days(list, the_day);
-        if right >= 0 {
-            let index = right as usize + num - 1;
-            if index < list.len() {
-                return Ok(&list[index]);
-            }
-        }
-        return Err(anyhow!("out of range"));
-    }
-
     /// 获取后续第num个交易日, 要求num大于零
     fn get_next_trading_day(&self, the_day: &NaiveDate, num: usize) -> anyhow::Result<&Tradingday> {
         assert!(num > 0);
@@ -264,21 +250,6 @@ pub trait TradingdayCache {
             let index = right as usize + num - 1;
             if index < list.len() {
                 return Ok(&list[index]);
-            }
-        }
-        return Err(anyhow!("out of range"));
-    }
-
-    /// 获取之前的第num个自然日(不一定是交易日)，要求num大于零
-    fn get_prev_day(&self, the_day: &NaiveDate, num: usize) -> Result<&Tradingday> {
-        assert!(num > 0);
-
-        let list = self.get_full_day_list();
-        let (left, _, _) = search_days(list, the_day);
-        if left >= 0 {
-            let index = left + 1 - (num as isize);
-            if index >= 0 {
-                return Ok(&list[index as usize]);
             }
         }
         return Err(anyhow!("out of range"));
