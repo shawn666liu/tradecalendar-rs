@@ -133,8 +133,6 @@ pub fn search_days(list: &[Tradingday], the_day: &NaiveDate) -> (isize, isize, i
 
 /// 获取下一(num)个工作日,即非周六周日的日期
 /// 用于get_next_trading_day()失败之后，强制取工作日
-/// fail_safe一般都发生在新年初,年末忘记了更新calendar,导致取新一年的交易日失败
-/// 而我们知道，一月一号元旦，一定是休假的，所以这里可以把元旦避开
 pub fn next_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
     assert!(num > 0);
 
@@ -143,9 +141,7 @@ pub fn next_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
 
     while numday > 0 {
         next = next.succ_opt().expect("succ_opt");
-        let week_day = next.weekday();
-        let isfirst = next.month() == 1 && next.day() == 1;
-        if week_day != Weekday::Sat && week_day != Weekday::Sun && !isfirst {
+        if is_working_day(&next) {
             numday -= 1;
         }
     }
@@ -154,8 +150,6 @@ pub fn next_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
 
 /// 获取前一(num)个工作日,即非周六周日的日期
 /// 用于get_prev_trading_day()失败之后，强制取工作日
-/// fail_safe一般都发生在新年初,年末忘记了更新calendar,导致取新一年的交易日失败
-/// 而我们知道，一月一号元旦，一定是休假的，所以这里可以把元旦避开
 pub fn prev_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
     assert!(num > 0);
 
@@ -164,9 +158,7 @@ pub fn prev_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
 
     while numday > 0 {
         prev = prev.pred_opt().expect("pred_opt");
-        let week_day = prev.weekday();
-        let isfirst = prev.month() == 1 && prev.day() == 1;
-        if week_day != Weekday::Sat && week_day != Weekday::Sun && !isfirst {
+        if is_working_day(&prev) {
             numday -= 1;
         }
     }
