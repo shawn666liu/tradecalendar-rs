@@ -563,21 +563,21 @@ impl TradeCalendar {
         if tday_shift >= &NaiveTime::from_hms_opt(21, 0, 0).expect("fromhms")
             || tday_shift <= &NaiveTime::from_hms_opt(16, 0, 0).expect("fromhms")
         {
-            return Err(anyhow!("TradingdayManager: `tday_shift`一般在夜里19~20."));
+            return Err(anyhow!("TradeCalendar: `tday_shift`一般在夜里19~20."));
         }
         if night_begin < day_end {
             return Err(anyhow!(
-                "TradingdayManager: `night_begin` should big than `day_end`."
+                "TradeCalendar: `night_begin` should big than `day_end`."
             ));
         }
         if day_end <= day_begin {
             return Err(anyhow!(
-                "TradingdayManager: `day_end` should big than `day_begin`."
+                "TradeCalendar: `day_end` should big than `day_begin`."
             ));
         }
         if day_begin <= night_end {
             return Err(anyhow!(
-                "TradingdayManager: `day_begin` should big than `night_end`."
+                "TradeCalendar: `day_begin` should big than `night_end`."
             ));
         }
 
@@ -593,7 +593,7 @@ impl TradeCalendar {
     /// 调用此函数之后，可以调用time_changed()刷新状态
     pub fn reload(&mut self, full_list: Vec<Tradingday>) -> Result<()> {
         if full_list.is_empty() {
-            return Err(anyhow!("TradingdayManager: full_list can't be empty."));
+            return Err(anyhow!("TradeCalendar: full_list can't be empty."));
         }
         self.trading_day_list = full_list
             .iter()
@@ -644,12 +644,12 @@ impl TradeCalendar {
             let max_dt = &self.full_day_list.last().expect("no fail").date;
             if &curr_date > min_dt && &curr_date < max_dt {
                 error_msg = Some(format!(
-                    "TradingdayManager: full_days_list ({} ~ {}), 缺少数据 {}",
+                    "TradeCalendar: full_days_list ({} ~ {}), 缺少数据 {}",
                     min_dt, max_dt, &curr_date,
                 ));
             } else {
                 error_msg = Some(format!(
-                    "TradingdayManager: full_days_list ({} ~ {}), out of range for {}",
+                    "TradeCalendar: full_days_list ({} ~ {}), out of range for {}",
                     min_dt, max_dt, &curr_date,
                 ));
             }
@@ -701,7 +701,7 @@ impl TradeCalendar {
                         self.next_tday = next_working_day(&current_tday, 1);
                     } else {
                         return Err(anyhow!(
-                            "TradingdayManager::time_change(), out of range for full_days_list"
+                            "TradeCalendar::time_change(), out of range for full_days_list"
                         ));
                     }
                 }
