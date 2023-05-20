@@ -468,7 +468,7 @@ struct TradingCheckConfig {
     /// 夜盘属于下一个交易日，这个变量指示什么时间点进行切换，一般是夜里19:00~20点，缺省19:30
     pub tday_shift: NaiveTime,
 
-    //-------------------- begin 以下几个字段用来判断当前是否接口应该处于连接状态
+    //-------------------- begin 以下几个字段用来判断接口是否应该处于连接状态
     /// 缺省夜里 20:30
     pub _night_begin: NaiveTime,
     /// 缺省凌晨 2:31
@@ -516,24 +516,19 @@ pub struct TradeCalendar {
 impl Default for TradeCalendar {
     fn default() -> Self {
         // trading_day_list列表不能为空，创建一个远古的日期
-        let date = NaiveDate::default();
-        let dummy = Tradingday::new_dummy(&date);
-        let prev_tday = prev_working_day(&dummy.date, 1);
+        let dummy = Tradingday::new_dummy(&NaiveDate::default());
 
         // 将当前交易日设置为无效值的意义:
         // 在time_changed()里面，与实际交易日比较时，才不会相同，才能被重新赋值
-        // current_time 同样
-        let curr_tday = NaiveDate::MIN;
-        let next_tday = dummy.next;
-
+        // current_time 同理
         Self {
-            curr_tday,
-            next_tday,
-            prev_tday,
-            full_day_list: vec![dummy],
-            trading_day_list: Default::default(),
+            curr_tday: NaiveDate::MIN,
             current_time: NaiveDateTime::MIN,
             is_trading: false,
+            full_day_list: vec![dummy],
+            trading_day_list: Default::default(),
+            next_tday: Default::default(),
+            prev_tday: Default::default(),
             cfg: Default::default(),
         }
     }
@@ -560,20 +555,22 @@ impl TradeCalendar {
         self.is_trading
     }
 
-    /// 获取当前交易日
-    pub fn trading_day(&self) -> &NaiveDate {
-        &self.curr_tday
-    }
-
+    /// 前一交易日
     pub fn prev_tday(&self) -> &NaiveDate {
         &self.prev_tday
     }
 
+    /// 获取当前交易日
+    pub fn current_tday(&self) -> &NaiveDate {
+        &self.curr_tday
+    }
+
+    /// 后一交易日
     pub fn next_tday(&self) -> &NaiveDate {
         &self.next_tday
     }
 
-    /// 获取最近设置的时间，可用于回溯模式
+    /// 获取最近设置的自然日(区别于交易日)及其时间，可用于回溯模式
     pub fn current_time(&self) -> &NaiveDateTime {
         &self.current_time
     }
@@ -635,14 +632,6 @@ impl TradeCalendar {
         if full_list.is_empty() {
             return Err(anyhow!("TradingdayManager: full_list can't be empty."));
         }
-        // let min_dt = &full_list[0].date;
-        // let max_dt = &full_list.last().expect("no fail").date;
-        // let date = &start.date();
-        // if date > max_dt || date < min_dt {
-        //     return Err(anyhow!(
-        //         "TradingdayManager: start's date must in full_list."
-        //     ));
-        // }
         self.trading_day_list = full_list
             .iter()
             .filter(|td| td.trading)
@@ -665,46 +654,44 @@ impl TradeCalendar {
 
     /// 时间改变，重新计算内部状态
     ///
-    /// fail_safe: 在失败时(主要是calendar没有及时更新的情况)尝试补救? 此参数目前暂时未启用，
+    /// fail_safe: 在失败时(主要是calendar没有及时更新的情况)尝试补救?
     ///
-    /// 返回值：tuple(自然日是否改变, 交易日是否改变, Option<Error_Message>)
-    #[allow(unused_variables)]
+    /// 返回值: tuple(上个交易日, 当前交易日, 上个自然日, 当前自然日, Option<Error_Message>)
+    ///    
     pub fn time_changed(
         &mut self,
         datetime: &NaiveDateTime,
         fail_safe: bool,
-    ) -> Result<(bool, bool, Option<String>)> {
+    ) -> Result<(NaiveDate, NaiveDate, NaiveDate, NaiveDate, Option<String>)> {
         // println!("time_changed() called.");
-        let date = datetime.date();
+        let curr_date = datetime.date();
         let old_date = self.current_time.date();
-        let mut date_changed = false;
-        if old_date != date {
-            date_changed = true;
-            log::trace!("自然日改变: {} => {}", old_date, date);
+        if old_date != curr_date {
+            log::trace!("自然日改变: {} => {}", old_date, curr_date);
         }
 
         let mut error_msg: Option<String> = None;
 
         let calendar: Tradingday;
-        let (left, index, right) = search_days(&self.full_day_list, &date);
+        let (_, index, _) = search_days(&self.full_day_list, &curr_date);
         if index >= 0 {
             calendar = (self.full_day_list[index as usize]).clone();
         } else {
             let min_dt = &self.full_day_list[0].date;
             let max_dt = &self.full_day_list.last().expect("no fail").date;
-            if &date > min_dt && &date < max_dt {
+            if &curr_date > min_dt && &curr_date < max_dt {
                 error_msg = Some(format!(
                     "TradingdayManager: full_days_list ({} ~ {}), 缺少数据 {}",
-                    min_dt, max_dt, &date,
+                    min_dt, max_dt, &curr_date,
                 ));
             } else {
                 error_msg = Some(format!(
                     "TradingdayManager: full_days_list ({} ~ {}), out of range for {}",
-                    min_dt, max_dt, &date,
+                    min_dt, max_dt, &curr_date,
                 ));
             }
             if fail_safe {
-                calendar = self.fail_safe_tradingday(datetime);
+                calendar = self.fail_safe_tradingday(&curr_date);
             } else {
                 return Err(anyhow!(error_msg.expect("no fail")));
             }
@@ -713,26 +700,24 @@ impl TradeCalendar {
         self.current_time = datetime.clone();
         let time = datetime.time();
 
-        let mut current_tday: NaiveDate;
         // 如果交易日当天有夜盘，则self.cfg.tday_shift作为下一个TradingDay的开始
         // 如果交易日当天没有夜盘，则夜里23:59:59之后的0点作为下一个TradingDay的开始
         // 非交易日，直接取next做为Tradingday
-        if calendar.trading {
-            current_tday = calendar.date;
+        let current_tday = if calendar.trading {
             if calendar.night && time >= self.cfg.tday_shift {
-                current_tday = calendar.next;
+                calendar.next
+            } else {
+                calendar.date
             }
         } else {
             // 非交易日
-            current_tday = calendar.next;
-        }
+            calendar.next
+        };
         let trading = self.check_is_trading(&time, &calendar);
         self.set_is_trading(trading);
 
-        let mut tday_changed = false;
-        let old_td = self.curr_tday;
-        if old_td != current_tday {
-            tday_changed = true;
+        let old_tday = self.curr_tday;
+        if old_tday != current_tday {
             self.curr_tday = current_tday;
             // get_prev_trading_day()的错误无需汇报，因为我们time_changed总是向前推进
             self.prev_tday = match self.get_prev_trading_day(&current_tday, 1) {
@@ -746,7 +731,10 @@ impl TradeCalendar {
                 Err(_) => {
                     // 这个可能会发生在年末岁初,calendar没有及时更新的情况下
                     if fail_safe {
-                        error_msg = Some("out of range. 请更新full_day_list".into());
+                        error_msg = Some(format!(
+                            "out of range when get next for {}. 请更新交易日历",
+                            &current_tday
+                        ));
                         self.next_tday = next_working_day(&current_tday, 1);
                     } else {
                         return Err(anyhow!(
@@ -757,14 +745,14 @@ impl TradeCalendar {
             };
             log::info!(
                 "交易日改变: {} => {}, prev {}, next {}, shift point {}",
-                old_td,
+                old_tday,
                 self.curr_tday,
                 self.prev_tday,
                 self.next_tday,
                 self.cfg.tday_shift
             );
         }
-        Ok((date_changed, tday_changed, error_msg))
+        Ok((old_tday, current_tday, old_date, curr_date, error_msg))
     }
 
     /// 重算is_trading变量, 当前Tradingday已知
@@ -789,25 +777,44 @@ impl TradeCalendar {
     }
 
     /// 已经超出了full_day_list的范围, 只能按照working day的方式, 构造一个范围外的Tradingday
-    fn fail_safe_tradingday(&mut self, datetime: &NaiveDateTime) -> Tradingday {
+    fn fail_safe_tradingday(&mut self, input: &NaiveDate) -> Tradingday {
         // 需要构造出一个Tradingday对象出来
-        let date = datetime.date();
-        let weekday = date.weekday();
-        let mut calendar = Tradingday::new_dummy(&date);
-        calendar.trading = is_working_day(&date);
+        let weekday = input.weekday();
+        let mut calendar = Tradingday::new_dummy(&input);
+        calendar.trading = is_working_day(&input);
+
         // 如果白天没有交易的话，则一定没有夜盘
-        // 如果白天有交易，则夜盘取决于后续是否有公共假期，但是这里显然没有假期数据
+        // 如果白天有交易，则夜盘取决于后续是否有公共假期，但是这里显然无法获取假期数据
         calendar.night = calendar.trading;
-        // 一般白天有交易时都会有早盘，除了两种情况
-        // 1) 周五的夜盘持续到周六早上，但周六白天不交易
-        // 2) 周一白天有交易，但显然没有早盘
+
+        // 一般白天有交易时都会有早盘，除了以下三种情况
         calendar.morning = calendar.trading;
-        if !calendar.trading && weekday == Weekday::Sat {
+        // 1) 周五的夜盘持续到周六早上，但周六白天不交易
+        if weekday == Weekday::Sat {
             calendar.morning = true;
         }
-        if calendar.trading && weekday == Weekday::Mon {
+        // 2) 周一白天有交易，但显然没有早盘
+        else if weekday == Weekday::Mon {
             calendar.morning = false;
         }
+        // 3) 从公共假期到input之间，没有工作日的话，则没有早盘， 因为放假前一天没有夜盘的。
+        // 这里能确定的假日就是元旦，五一国庆当然也能确定，但五一国庆的时候肯定已经更新交易日历了吧，
+        // 所以这里只检查元旦就OK了
+        let first_day = NaiveDate::from_ymd_opt(input.year(), 1, 1).unwrap();
+        let mut theday = input.clone() - chrono::Duration::days(1);
+        let mut has_working_day = false;
+        while theday > first_day {
+            if is_working_day(&theday) {
+                has_working_day = true;
+                break;
+            }
+            theday -= chrono::Duration::days(1);
+        }
+        if !has_working_day {
+            calendar.morning = false;
+        }
+
+        // println!("{}", calendar);
 
         return calendar;
     }
@@ -821,6 +828,7 @@ mod tests {
     // use crate::CSV;
 
     #[test]
+    #[allow(unused_variables)]
     fn test_calendar() -> anyhow::Result<()> {
         let buf = "date,morning,trading,night,next
 2021-01-01,false,false,false,2021-01-04
@@ -861,8 +869,9 @@ mod tests {
 
         // 以上数据:
         // 1） 从 2021-02-01 后开始缺失，
-        // 2） 由于 2021-12-31 这条数据实际是我们在2020年12月左右生成的, 其后一交易日当时只能推断出是2022-01-03,
+        // 2） 由于 2021-12-31 这条数据实际是在2020年12月左右生成的, 其后一交易日当时只能推断出是2022-01-03,
         // 实际情况是2022年的公共假日在2021年12月左右公布，2022-01-03是节假日, 这个位置正确的值是2022-01-04
+        // 不更新交易日历，仅通过fail_safe，是无法修正这个数据的
 
         let y20201230 = NaiveDate::from_ymd_opt(2020, 12, 30).expect("chrono");
         let y20201231 = NaiveDate::from_ymd_opt(2020, 12, 31).expect("chrono");
@@ -880,6 +889,14 @@ mod tests {
         let y20220102 = NaiveDate::from_ymd_opt(2022, 1, 2).expect("chrono");
         let y20220103 = NaiveDate::from_ymd_opt(2022, 1, 3).expect("chrono");
         let y20220104 = NaiveDate::from_ymd_opt(2022, 1, 4).expect("chrono");
+        let y20240101 = NaiveDate::from_ymd_opt(2024, 1, 1).expect("chrono");
+
+        let list = Tradingday::load_csv_read(buf.as_bytes())?;
+        // println!("{:?}", list);
+
+        // let wtr = CSV::save_csv_write(Vec::new(), list)?;
+        // let data = String::from_utf8(wtr.into_inner()?)?;
+        // println!("\ncsv result is\n{}", data);
 
         let mut mgr = TradeCalendar::new();
         mgr.set_config(
@@ -889,8 +906,7 @@ mod tests {
             &NaiveTime::from_hms_opt(8, 30, 0).expect("fromhms"),
             &NaiveTime::from_hms_opt(15, 30, 0).expect("fromhms"),
         )?;
-        let list = Tradingday::load_csv_read(buf.as_bytes())?;
-        // println!("{:?}", list);
+
         mgr.reload(list)?;
         let td = mgr.get_next_trading_day(&y20210101, 1)?;
         assert_eq!(td.date, y20210104,);
@@ -908,75 +924,113 @@ mod tests {
         assert_eq!(td.date, y20210105);
 
         let datetime = y20210105.and_hms_opt(9, 10, 5).unwrap();
-        let (date_changed, tday_change, opt_err) = mgr.time_changed(&datetime, false)?;
-        assert!(date_changed);
-        assert!(tday_change);
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, false)?;
+        assert_ne!(old_date, curr_date);
+        assert_ne!(old_tday, curr_tday);
         assert!(opt_err.is_none());
         assert_eq!(mgr.is_trading(), true);
 
         let datetime = y20210108.and_hms_opt(19, 28, 30).unwrap();
-        let (_, tday_change, _) = mgr.time_changed(&datetime, false)?;
-        assert!(tday_change);
-        assert_eq!(mgr.trading_day(), &y20210108);
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, false)?;
+        assert_ne!(old_tday, curr_tday);
+        assert_eq!(mgr.current_tday(), &y20210108);
         assert_eq!(mgr.is_trading(), false);
 
         let datetime = y20210108.and_hms_opt(19, 29, 30).unwrap();
-        let (date_changed, tday_change, _) = mgr.time_changed(&datetime, false)?;
-        assert!(!date_changed);
-        assert!(!tday_change);
-        assert_eq!(mgr.trading_day(), &y20210108);
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, false)?;
+        assert_eq!(old_date, curr_date);
+        assert_eq!(old_tday, curr_tday);
+        assert_eq!(mgr.current_tday(), &y20210108);
         assert_eq!(mgr.is_trading(), false);
 
         let datetime = y20210108.and_hms_opt(19, 30, 0).unwrap();
-        let (_, tday_change, _) = mgr.time_changed(&datetime, false)?;
-        assert!(tday_change);
-        assert_eq!(mgr.trading_day(), &y20210111);
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, false)?;
+        assert_ne!(old_tday, curr_tday);
+        assert_eq!(mgr.current_tday(), &y20210111);
         assert_eq!(mgr.is_trading(), false);
 
         let datetime = y20210108.and_hms_opt(20, 30, 0).unwrap();
-        let (_, tday_change, _) = mgr.time_changed(&datetime, false)?;
-        assert!(!tday_change);
-        assert_eq!(mgr.trading_day(), &y20210111);
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, false)?;
+        assert_eq!(old_tday, curr_tday);
+        assert_eq!(mgr.current_tday(), &y20210111);
         assert_eq!(mgr.is_trading(), true);
 
         // 中间数据缺失
         let datetime = y20210202.and_hms_opt(0, 0, 0).unwrap();
-        let (_, _, opt_err) = mgr.time_changed(&datetime, true)?;
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, true)?;
         assert!(opt_err.is_some());
-        println!("{}", opt_err.unwrap());
-        assert_eq!(mgr.trading_day(), &y20210202);
+        // println!("{}", opt_err.unwrap());
+        assert_eq!(mgr.current_tday(), &y20210202);
 
         // fail_safe
 
-        // missing before, 这种情况在实盘是不会出现的，因为日期总是向后推进，不会向前
+        // missing before, 这种情况在实盘一般是不会出现的，因为日期总是向后推进，不会向前
         let datetime = y20201230.and_hms_opt(20, 30, 0).unwrap();
         let res = mgr.time_changed(&datetime, false);
         assert!(res.is_err());
 
-        let (date_changed, tday_change, opt_err) = mgr.time_changed(&datetime, true)?;
-        assert!(date_changed);
-        assert!(tday_change);
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, true)?;
+        assert_ne!(old_tday, curr_tday);
         assert!(opt_err.is_some());
-        assert_eq!(mgr.trading_day(), &y20201231);
+        assert_eq!(mgr.current_tday(), &y20201231);
         assert_eq!(mgr.is_trading(), true);
 
         // missing after, 实盘可能遭遇这种情况,
-        let datetime = y20211231.and_hms_opt(20, 30, 0).unwrap();
-        let (_, _, opt_err) = mgr.time_changed(&datetime, true)?;
-        assert!(opt_err.is_none());
-        assert_eq!(mgr.trading_day(), &y20211231);
-        assert_eq!(mgr.is_trading(), true);
+        let datetime = y20211231.and_hms_opt(10, 30, 0).unwrap();
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, true)?;
+        // println!(
+        //     "({}) => {}, {}, {}, {}",
+        //     datetime, old_tday, curr_tday, old_date, curr_date
+        // );
 
-        // let wtr = CSV::save_csv_write(Vec::new(), days)?;
-        // let data = String::from_utf8(wtr.into_inner()?)?;
-        // println!("\ncsv result is\n{}", data);
+        // 由于12月31日后面是元旦，是假期， 所以12月31日没有夜盘，交易日是不会切换的
+        let datetime = y20211231.and_hms_opt(21, 30, 0).unwrap();
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+            mgr.time_changed(&datetime, true)?;
+        // println!(
+        //     "({}) => {}, {}, {}, {}",
+        //     datetime, old_tday, curr_tday, old_date, curr_date
+        // );
+        assert!(opt_err.is_none());
+        assert_eq!(mgr.current_tday(), &y20211231);
+        assert_eq!(mgr.is_trading(), false);
+
+        // let mut datetime = y20240101.and_hms_opt(0, 30, 0).unwrap();
+        // for idx in 1..=50 {
+        //     datetime += chrono::Duration::hours(3);
+        //     let (old_tday, curr_tday, old_date, curr_date, opt_err) =
+        //         mgr.time_changed(&datetime, true)?;
+        //     println!(
+        //         "{:>2}: ({} {:>}) => {}, {}, {}, {}, trading? {}",
+        //         idx,
+        //         datetime,
+        //         datetime.date().weekday(),
+        //         old_tday,
+        //         curr_tday,
+        //         old_date,
+        //         curr_date,
+        //         mgr.is_trading()
+        //     );
+        // }
+
+        // 仅能判断出2024-01-02没有凌晨盘，但无法确定2024-01-02是否节假日
+        let tday = mgr.fail_safe_tradingday(&(y20240101 + chrono::Duration::days(1)));
+        assert!(!tday.morning);
 
         let start = y20210120.and_hms_opt(18, 22, 0).expect("chrono");
         mgr.reset(Some(&start))?;
-        assert_eq!(mgr.trading_day(), &y20210120);
+        assert_eq!(mgr.current_tday(), &y20210120);
         let start = NaiveDateTime::from_str("2021-01-20T20:22:00").expect("chrono");
         mgr.reset(Some(&start))?;
-        assert_eq!(mgr.trading_day(), &y20210121);
+        assert_eq!(mgr.current_tday(), &y20210121);
         Ok(())
     }
 }
