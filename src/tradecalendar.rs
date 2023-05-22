@@ -461,6 +461,7 @@ impl Default for TradingCheckConfig {
 ///
 /// 外部触发trading状态切换、交易日更改的函数为 time_changed()，返回值：tuple(自然日是否改变，交易日是否改变)
 /// 若返回值中含有true, 则有状态改变，调用方可采取相应动作
+#[derive(Default)]
 pub struct TradeCalendar {
     full_day_list: Vec<Tradingday>,
     trading_day_list: Vec<Tradingday>,
@@ -476,27 +477,6 @@ pub struct TradeCalendar {
     prev_tday: NaiveDate,
 }
 
-impl Default for TradeCalendar {
-    fn default() -> Self {
-        // trading_day_list列表不能为空，创建一个远古的日期
-        let dummy = Tradingday::new_dummy(&NaiveDate::default());
-
-        // 将当前交易日设置为无效值的意义:
-        // 在time_changed()里面，与实际交易日比较时，才不会相同，才能被重新赋值
-        // current_time 同理
-        Self {
-            curr_tday: NaiveDate::MIN,
-            current_time: NaiveDateTime::MIN,
-            is_trading: false,
-            full_day_list: vec![dummy],
-            trading_day_list: Default::default(),
-            next_tday: Default::default(),
-            prev_tday: Default::default(),
-            cfg: Default::default(),
-        }
-    }
-}
-
 impl TradingdayCache for TradeCalendar {
     fn get_full_day_list(&self) -> &Vec<Tradingday> {
         return &self.full_day_list;
@@ -508,9 +488,17 @@ impl TradingdayCache for TradeCalendar {
 }
 
 impl TradeCalendar {
-    /// 使用new创建之后，紧接着调用reload()进行初始化
+    /// 使用new创建之后，紧接着调用reload()加载日历数据, 然后time_changed()进行初始化
     pub fn new() -> Self {
-        Default::default()
+        // 将当前交易日设置为无效值的意义:
+        // 在time_changed()里面，与实际交易日比较时，才不会相同，才能被重新赋值
+        // current_time 同理,
+        // 缺省值在1970年，其实也是可以的
+        Self {
+            curr_tday: NaiveDate::MIN,
+            current_time: NaiveDateTime::MIN,
+            ..Default::default()
+        }
     }
 
     /// 当前时间是否在CTP服务器可连接时段
@@ -593,7 +581,7 @@ impl TradeCalendar {
     /// 调用此函数之后，可以调用time_changed()刷新状态
     pub fn reload(&mut self, full_list: Vec<Tradingday>) -> Result<()> {
         if full_list.is_empty() {
-            return Err(anyhow!("TradeCalendar: full_list can't be empty."));
+            return Err(anyhow!("TradeCalendar: full_list is empty."));
         }
         self.trading_day_list = full_list
             .iter()

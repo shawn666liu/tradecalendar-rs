@@ -14,3 +14,7 @@ encoding_rs_io = "*"
 log = "*"
 serde = {version = '*', features = ["derive"]}
 # serde_json = "*"
+
+[dev-dependencies]
+crossbeam-channel = "*"
+ctrlc = "*"
