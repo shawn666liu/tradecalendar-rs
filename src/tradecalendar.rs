@@ -61,7 +61,7 @@ impl Tradingday {
         }
     }
 
-    /// 文件头：date,morning,trading,night
+    /// 文件头：date,morning,trading,night,next
     ///
     /// 行格式：2009-01-03,false,false,false,2009-01-04
     pub fn load_csv_file<P: AsRef<Path>>(path: P) -> Result<Vec<Tradingday>> {
@@ -763,18 +763,20 @@ impl TradeCalendar {
         // 3) 从公共假期到input之间，没有工作日的话，则没有早盘， 因为放假前一天没有夜盘的。
         // 这里能确定的假日就是元旦，五一国庆当然也能确定，但五一国庆的时候肯定已经更新交易日历了吧，
         // 所以这里只检查元旦就OK了
-        let first_day = NaiveDate::from_ymd_opt(input.year(), 1, 1).unwrap();
-        let mut theday = input.clone() - chrono::Duration::days(1);
-        let mut has_working_day = false;
-        while theday > first_day {
-            if is_working_day(&theday) {
-                has_working_day = true;
-                break;
+        if calendar.morning {
+            let first_day = NaiveDate::from_ymd_opt(input.year(), 1, 1).unwrap();
+            let mut theday = input.clone() - chrono::Duration::days(1);
+            let mut has_working_day = false;
+            while theday > first_day {
+                if is_working_day(&theday) {
+                    has_working_day = true;
+                    break;
+                }
+                theday -= chrono::Duration::days(1);
             }
-            theday -= chrono::Duration::days(1);
-        }
-        if !has_working_day {
-            calendar.morning = false;
+            if !has_working_day {
+                calendar.morning = false;
+            }
         }
 
         // println!("{}", calendar);
