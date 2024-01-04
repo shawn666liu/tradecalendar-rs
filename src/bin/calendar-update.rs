@@ -62,17 +62,23 @@ fn main() -> Result<()> {
 
     // 使用循环,
     let mut holidays = Vec::new();
+    let mut holiday_names: Vec<String> = Vec::new();
     for line_res in lines {
         let line = line_res?;
         println!("{}", line);
         let line = line.trim();
-        match line.split(',').next() {
+        let mut splt = line.split(',');
+        match splt.next() {
             Some(item) => {
                 let item = item.trim();
                 // 空行,非数字开头的都忽略掉
                 if !item.is_empty() && item.chars().next().unwrap().is_ascii_digit() {
                     let date = NaiveDate::parse_from_str(item, "%Y-%m-%d")?;
                     holidays.push(date);
+                    match splt.next() {
+                        Some(name) => holiday_names.push(name.into()),
+                        None => holiday_names.push("".to_owned()),
+                    }
                 }
             }
             None => {}
@@ -96,6 +102,7 @@ fn main() -> Result<()> {
     //     .map(|x| try { NaiveDate::parse_from_str(&(x?).split(',').next().unwrap(), "%Y-%m-%d")? })
     //     .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
+    gen_holiday_sql(out_dir, &holidays, &holiday_names)?;
     let td_list = holidays_to_tradingdays(&holidays);
     gen_trade_day_csv(&td_list, out_dir)?;
     let all_days = tradingdays_to_calendar(&td_list);

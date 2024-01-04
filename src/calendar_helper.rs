@@ -139,6 +139,38 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday>
     return result;
 }
 
+/// 生成 holiday.sql用于postgres
+pub fn gen_holiday_sql<P: AsRef<Path>>(
+    out_dir: P,
+    holidays: &[NaiveDate],
+    holiday_names: &[String],
+) -> anyhow::Result<()> {
+    let out_dir = out_dir.as_ref();
+    if !out_dir.exists() {
+        std::fs::create_dir_all(out_dir)
+            .expect(&format!("create out dir `{}` failed.", out_dir.display()));
+    }
+    let p1 = out_dir.join("pg_holiday.sql");
+    let mut f1 = File::create(&p1).with_context(|| p1.display().to_string())?;
+    write!(f1, "{}", "insert into holiday (_date,_name) values ")?;
+    let last_idx = holidays.len() - 1;
+    for (idx, tday) in holidays.iter().enumerate() {
+        write!(
+            f1,
+            "('{}','{}')",
+            tday.format("%Y-%m-%d"),
+            holiday_names[idx],
+        )?;
+        if idx < last_idx {
+            f1.write(b",")?;
+        }
+    }
+    f1.write(b";")?;
+    println!("pg_holiday.sql: {}", std::fs::canonicalize(p1)?.display());
+
+    Ok(())
+}
+
 /// 生成交易日csv文件
 ///
 /// 生成postgresql的trade_day表，只有_date一个字段
