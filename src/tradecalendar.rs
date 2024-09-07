@@ -13,9 +13,9 @@ use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike, 
 
 #[cfg(feature = "with-jiff")]
 use {
-    core::ops::SubAssign,
     jiff::civil::{self, Date, DateTime, Time, Weekday},
     jiff::{ToSpan, Unit},
+    std::ops::SubAssign,
 };
 
 use super::common::*;

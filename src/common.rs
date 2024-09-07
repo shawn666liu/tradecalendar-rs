@@ -2,10 +2,7 @@
 use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Weekday};
 
 #[cfg(feature = "with-jiff")]
-use {
-    jiff::civil::{self, Date, DateTime, Time, Weekday},
-    jiff::{ToSpan, Unit},
-};
+use jiff::civil::{Date, DateTime, Time};
 
 #[cfg(feature = "with-chrono")]
 pub type MyDateType = NaiveDate;

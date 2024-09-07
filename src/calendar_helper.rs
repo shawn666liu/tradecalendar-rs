@@ -6,7 +6,7 @@ use chrono::{Datelike, Duration, NaiveDate, Weekday};
 
 #[cfg(feature = "with-jiff")]
 use {
-    jiff::civil::{Date, Weekday},
+    jiff::civil::Weekday,
     jiff::ToSpan,
     std::ops::AddAssign,
 };
