@@ -1,7 +1,11 @@
 use anyhow::Result;
-use chrono::Local;
 use crossbeam_channel::{bounded, select, tick, Receiver};
 use std::time::Duration;
+
+#[cfg(feature = "with-chrono")]
+use chrono::{Local, NaiveDateTime};
+#[cfg(feature = "with-jiff")]
+use jiff::{civil::DateTime, Zoned};
 
 use tradecalendar::{TradeCalendar, Tradingday, TradingdayCache};
 
@@ -14,6 +18,15 @@ fn ctrl_channel() -> Result<Receiver<()>, ctrlc::Error> {
     Ok(receiver)
 }
 
+#[cfg(feature = "with-chrono")]
+fn get_now() -> NaiveDateTime {
+    Local::now().naive_local()
+}
+#[cfg(feature = "with-jiff")]
+fn get_now() -> DateTime {
+    Zoned::now().datetime()
+}
+
 fn main() -> Result<()> {
     let csv_str = include_str!("calendar.csv");
     let mut calendar = TradeCalendar::new();
@@ -23,7 +36,7 @@ fn main() -> Result<()> {
     let full_list = Tradingday::load_csv_read(csv_str.as_bytes())?;
     println!("loaded {} Tradingday entities", full_list.len());
     calendar.reload(full_list)?;
-    let now = Local::now().naive_local();
+    let now = get_now();
     let today = now.date();
     let prev_tday = calendar.get_prev_trading_day(&today, 1)?;
     let next_tday = calendar.get_next_trading_day(&today, 1)?;
@@ -32,7 +45,7 @@ fn main() -> Result<()> {
         prev_tday.date, next_tday.date
     );
     let next_10_tday = calendar.get_next_trading_day(&today, 10)?;
-    let tomorrow = today.succ_opt().unwrap();
+    let tomorrow = tomorrow(&today);
     let tday_slice = calendar.get_trading_day_slice(&tomorrow, &next_10_tday.date);
     println!("next 10 tradingdays will be");
     for tday in tday_slice {
@@ -49,7 +62,7 @@ fn main() -> Result<()> {
     loop {
         select! {
             recv(ticks) -> _ => {
-                let now = Local::now().naive_local();
+                let now = get_now();
                 let (old_tday, now_tday,old_date, now_date, opt_err) = calendar.time_changed(&now, true)?;
                 if let Some(err) = opt_err {
                     println!("Error: {err}");

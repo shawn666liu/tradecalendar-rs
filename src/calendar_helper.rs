@@ -1,21 +1,43 @@
 use anyhow::{Context, Result};
-use chrono::{Datelike, Duration, NaiveDate, Weekday};
 use std::{fs::File, io::Write, path::Path};
 
+#[cfg(feature = "with-chrono")]
+use chrono::{Datelike, Duration, NaiveDate, Weekday};
+
+#[cfg(feature = "with-jiff")]
+use {
+    jiff::civil::{Date, Weekday},
+    jiff::ToSpan,
+    std::ops::AddAssign,
+};
+
+use super::common::*;
 use super::tradecalendar::*;
 
 /// 将当年假期列表，转换为交易日列表(排除了周末及这些假期, 仅交易日)
-pub fn holidays_to_tradingdays(holiday_list: &Vec<NaiveDate>) -> Vec<NaiveDate> {
-    let mut the_day = NaiveDate::from_ymd_opt(holiday_list[0].year(), 1, 1).expect("fromymd");
-    let next_year_first = NaiveDate::from_ymd_opt(holiday_list[0].year() + 1, 1, 1).unwrap();
-    let mut result: Vec<NaiveDate> = Vec::with_capacity(260);
+pub fn holidays_to_tradingdays(holiday_list: &Vec<MyDateType>) -> Vec<MyDateType> {
+    let mut the_day = make_date(holiday_list[0].year(), 1, 1);
+    let next_year_first = make_date(holiday_list[0].year() + 1, 1, 1);
+    let mut result: Vec<MyDateType> = Vec::with_capacity(260);
     while the_day < next_year_first {
         let dw = the_day.weekday();
-        if dw != Weekday::Sat && dw != Weekday::Sun && !holiday_list.contains(&the_day) {
-            result.push(the_day);
-            // println!("{}", the_day);
+        #[cfg(feature = "with-chrono")]
+        {
+            if dw != Weekday::Sat && dw != Weekday::Sun && !holiday_list.contains(&the_day) {
+                result.push(the_day);
+                // println!("{}", the_day);
+            }
+            the_day = tomorrow(&the_day);
         }
-        the_day = the_day.succ_opt().unwrap();
+        #[cfg(feature = "with-jiff")]
+        {
+            if dw != Weekday::Saturday && dw != Weekday::Sunday && !holiday_list.contains(&the_day)
+            {
+                result.push(the_day);
+                // println!("{}", the_day);
+            }
+            the_day = tomorrow(&the_day);
+        }
     }
     println!("本年度交易日数量({})", result.len());
     return result;
@@ -24,7 +46,7 @@ pub fn holidays_to_tradingdays(holiday_list: &Vec<NaiveDate>) -> Vec<NaiveDate> 
 /// 将交易日列表转换为Tradingday列表，交易日列表可以来自holidays_to_tradingdays()函数转换，也可以来自从其他平台的查询   
 /// 更新: 现在非交易日也写入数据库，Tradingday的trading项为false，周六非交易日，但周五夜盘会持续到凌晨，所以其morning项可以为true   
 /// 返回值: 上年度最后一个交易日及本年度所有日期构成的Tradingday列表
-pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday> {
+pub fn tradingdays_to_calendar(trading_days: &Vec<MyDateType>) -> Vec<Tradingday> {
     assert!(
         trading_days.len() > 2,
         "tradingdays_to_calendar() 输入日期数据太短"
@@ -34,13 +56,18 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday>
     // 即我们并不知道后一年元旦放假的具体情况
     // 此时假期安排已经公布，需要进行修正
     // pre_day是上一年度的最后一个交易日，很可能是12月31日，如果不是的话，则倒退寻找
-    let mut pre_day = NaiveDate::from_ymd_opt(trading_days[0].year(), 1, 1)
-        .expect("ymdopt")
-        .pred_opt()
-        .expect("predopt");
+
+    let mut pre_day = yesterday(&make_date(trading_days[0].year(), 1, 1));
+
     let mut dw = pre_day.weekday();
+    #[cfg(feature = "with-chrono")]
     while dw == Weekday::Sat || dw == Weekday::Sun {
-        pre_day = pre_day.pred_opt().expect("predopt");
+        pre_day = yesterday(&pre_day);
+        dw = pre_day.weekday();
+    }
+    #[cfg(feature = "with-jiff")]
+    while dw == Weekday::Saturday || dw == Weekday::Sunday {
+        pre_day = yesterday(&pre_day);
         dw = pre_day.weekday();
     }
 
@@ -55,16 +82,18 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday>
     // 由于中国在十一月十二月没有额外的公共假期，所以很容易判断pre_day的morning，如果是周一则没有，其他日期则有
     let pre_year_last_tday = Tradingday {
         date: pre_day,
+        #[cfg(feature = "with-chrono")]
         morning: dw != Weekday::Mon,
+        #[cfg(feature = "with-jiff")]
+        morning: dw != Weekday::Monday,
         trading: true,
         night: pre_day_night,
         next: first_tday,
     };
     result.push(pre_year_last_tday);
 
-    let next_yuandan =
-        NaiveDate::from_ymd_opt(trading_days[trading_days.len() - 1].year() + 1, 1, 1)
-            .expect("fromymdopt");
+    let next_yuandan = make_date(trading_days[trading_days.len() - 1].year() + 1, 1, 1);
+
     println!(
         "正在准备数据, [{}, {}),请稍候... ",
         first_tday, next_yuandan
@@ -74,8 +103,8 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday>
         let mut the_day = trading_days[idx];
 
         // 中间可能有非交易日
-        while pre_day < the_day.pred_opt().expect("predopt") {
-            pre_day = pre_day.succ_opt().expect("succopt");
+        while pre_day < yesterday(&the_day) {
+            pre_day = tomorrow(&pre_day);
             let rec = Tradingday {
                 date: pre_day,
                 morning: pre_day_night,
@@ -103,7 +132,14 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday>
                 next: next_year_first_trading_day,
             };
             result.push(rec);
-            the_day += Duration::days(1);
+            #[cfg(feature = "with-chrono")]
+            {
+                the_day += Duration::days(1);
+            }
+
+            #[cfg(feature = "with-jiff")]
+            the_day.add_assign(1.days());
+
             while the_day < next_yuandan {
                 let rec = Tradingday {
                     date: the_day,
@@ -113,16 +149,23 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday>
                     next: next_year_first_trading_day,
                 };
                 result.push(rec);
-                the_day = the_day.succ_opt().expect("succopt");
+                the_day = tomorrow(&the_day);
             }
         } else {
             let next_trading_day = trading_days[idx + 1];
             // 判断当天凌晨有交易：昨天夜里有交易的话，则当天凌晨有交易，反之亦然，充要条件
             // 判断当天是否有夜盘：第二天是交易日，或者3天后是交易日且为星期一
             // 这个判断可靠吗？ 有没有可能，仅放假周六周日，但周五晚上没有夜盘的情况？
-            let has_night_mkt = next_trading_day == the_day.succ_opt().expect("succopt")
+            #[cfg(feature = "with-chrono")]
+            let has_night_mkt = next_trading_day == tomorrow(&the_day)
                 || (next_trading_day == the_day + Duration::days(3)
                     && next_trading_day.weekday() == Weekday::Mon);
+
+            #[cfg(feature = "with-jiff")]
+            let has_night_mkt = next_trading_day == tomorrow(&the_day)
+                || (next_trading_day == the_day + 3.days()
+                    && next_trading_day.weekday() == Weekday::Monday);
+
             let rec = Tradingday {
                 date: the_day,
                 morning: pre_day_night,
@@ -142,7 +185,7 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<NaiveDate>) -> Vec<Tradingday>
 /// 生成 holiday.sql用于postgres
 pub fn gen_holiday_sql<P: AsRef<Path>>(
     out_dir: P,
-    holidays: &[NaiveDate],
+    holidays: &[MyDateType],
     holiday_names: &[String],
 ) -> anyhow::Result<()> {
     let out_dir = out_dir.as_ref();
@@ -155,12 +198,21 @@ pub fn gen_holiday_sql<P: AsRef<Path>>(
     write!(f1, "{}", "insert into holiday (_date,_name) values ")?;
     let last_idx = holidays.len() - 1;
     for (idx, tday) in holidays.iter().enumerate() {
+        #[cfg(feature = "with-chrono")]
         write!(
             f1,
             "('{}','{}')",
             tday.format("%Y-%m-%d"),
             holiday_names[idx],
         )?;
+        #[cfg(feature = "with-jiff")]
+        write!(
+            f1,
+            "('{}','{}')",
+            tday.strftime("%Y-%m-%d"),
+            holiday_names[idx],
+        )?;
+
         if idx < last_idx {
             f1.write(b",")?;
         }
@@ -174,7 +226,7 @@ pub fn gen_holiday_sql<P: AsRef<Path>>(
 /// 生成交易日csv文件
 ///
 /// 生成postgresql的trade_day表，只有_date一个字段
-pub fn gen_trade_day_csv<P: AsRef<Path>>(tdays: &Vec<NaiveDate>, out_dir: P) -> Result<()> {
+pub fn gen_trade_day_csv<P: AsRef<Path>>(tdays: &Vec<MyDateType>, out_dir: P) -> Result<()> {
     let out_dir = out_dir.as_ref();
     if !out_dir.exists() {
         std::fs::create_dir_all(out_dir)
@@ -188,11 +240,22 @@ pub fn gen_trade_day_csv<P: AsRef<Path>>(tdays: &Vec<NaiveDate>, out_dir: P) -> 
     writeln!(f2, "tradeday")?;
     let last_idx = tdays.len() - 1;
     for (idx, tday) in tdays.iter().enumerate() {
-        write!(f1, "('{}')", tday.format("%Y-%m-%d"))?;
-        if idx < last_idx {
-            f1.write(b",")?;
+        #[cfg(feature = "with-chrono")]
+        {
+            write!(f1, "('{}')", tday.format("%Y-%m-%d"))?;
+            if idx < last_idx {
+                f1.write(b",")?;
+            }
+            writeln!(f2, "{}", tday.format("%Y-%m-%d"))?;
         }
-        writeln!(f2, "{}", tday.format("%Y-%m-%d"))?;
+        #[cfg(feature = "with-jiff")]
+        {
+            write!(f1, "('{}')", tday.strftime("%Y-%m-%d"))?;
+            if idx < last_idx {
+                f1.write(b",")?;
+            }
+            writeln!(f2, "{}", tday.strftime("%Y-%m-%d"))?;
+        }
     }
     f1.write(b";")?;
     println!("pg_trade_day.sql: {}", std::fs::canonicalize(p1)?.display());
@@ -226,24 +289,48 @@ pub fn gen_calendar_csv<P: AsRef<Path>>(
 
     let last_idx = calendar.len() - 1;
     for (idx, t) in calendar.iter().enumerate() {
-        writeln!(
-            f1,
-            "{},{},{},{},{}",
-            t.date.format("%Y-%m-%d"),
-            t.morning,
-            t.trading,
-            t.night,
-            t.next.format("%Y-%m-%d"),
-        )?;
-        write!(
-            f2,
-            "('{}',{},{},{},'{}')",
-            t.date.format("%Y-%m-%d"),
-            if t.morning { 1 } else { 0 },
-            if t.trading { 1 } else { 0 },
-            if t.night { 1 } else { 0 },
-            t.next.format("%Y-%m-%d"),
-        )?;
+        #[cfg(feature = "with-chrono")]
+        {
+            writeln!(
+                f1,
+                "{},{},{},{},{}",
+                t.date.format("%Y-%m-%d"),
+                t.morning,
+                t.trading,
+                t.night,
+                t.next.format("%Y-%m-%d"),
+            )?;
+            write!(
+                f2,
+                "('{}',{},{},{},'{}')",
+                t.date.format("%Y-%m-%d"),
+                if t.morning { 1 } else { 0 },
+                if t.trading { 1 } else { 0 },
+                if t.night { 1 } else { 0 },
+                t.next.format("%Y-%m-%d"),
+            )?;
+        }
+        #[cfg(feature = "with-jiff")]
+        {
+            writeln!(
+                f1,
+                "{},{},{},{},{}",
+                t.date.strftime("%Y-%m-%d"),
+                t.morning,
+                t.trading,
+                t.night,
+                t.next.strftime("%Y-%m-%d"),
+            )?;
+            write!(
+                f2,
+                "('{}',{},{},{},'{}')",
+                t.date.strftime("%Y-%m-%d"),
+                if t.morning { 1 } else { 0 },
+                if t.trading { 1 } else { 0 },
+                if t.night { 1 } else { 0 },
+                t.next.strftime("%Y-%m-%d"),
+            )?;
+        }
         if idx < last_idx {
             f2.write(b",")?;
         }
@@ -288,11 +375,20 @@ mod tests {
             "2022-10-07",
         ];
 
-        let holidays: Vec<NaiveDate> = holidays
+        #[cfg(feature = "with-chrono")]
+        let holidays: Vec<MyDateType> = holidays
             .iter()
             .map(|&x| {
-                NaiveDate::parse_from_str(x, "%Y-%m-%d")
+                MyDateType::parse_from_str(x, "%Y-%m-%d")
                     .expect(&format!("parse holiday error:{}", x))
+            })
+            .collect();
+
+        #[cfg(feature = "with-jiff")]
+        let holidays: Vec<MyDateType> = holidays
+            .iter()
+            .map(|&x| {
+                MyDateType::strptime("%Y-%m-%d", x).expect(&format!("parse holiday error:{}", x))
             })
             .collect();
 

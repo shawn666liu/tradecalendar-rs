@@ -1,14 +1,19 @@
 // #![feature(try_blocks)]
 
 use anyhow::{anyhow, Result};
-use chrono::NaiveDate;
 use clap::{arg, value_parser, Command};
 use encoding_rs_io::DecodeReaderBytes;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
+#[cfg(feature = "with-chrono")]
+use chrono::NaiveDate;
+#[cfg(feature = "with-jiff")]
+use jiff::civil::Date;
+
 use tradecalendar::calendar_helper::*;
+use tradecalendar::common::*;
 
 // input 节假日文件格式如下
 /*
@@ -73,7 +78,10 @@ fn main() -> Result<()> {
                 let item = item.trim();
                 // 空行,非数字开头的都忽略掉
                 if !item.is_empty() && item.chars().next().unwrap().is_ascii_digit() {
+                    #[cfg(feature = "with-chrono")]
                     let date = NaiveDate::parse_from_str(item, "%Y-%m-%d")?;
+                    #[cfg(feature = "with-jiff")]
+                    let date = Date::strptime("%Y-%m-%d", item)?;
                     holidays.push(date);
                     match splt.next() {
                         Some(name) => holiday_names.push(name.into()),

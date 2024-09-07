@@ -5,15 +5,25 @@ version = "0.1.1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+with-chrono = ["chrono"]
+with-jiff = ["jiff"]
+
+[package.metadata.docs.rs]
+all-features = false
+features = ["with-chrono", "with-jiff"]
+
 [dependencies]
 anyhow = "*"
-chrono = {version = "*", features = ["serde"]}
+chrono = { version = "*", features = ["serde"], optional = true }
+jiff = { version = "*", features = ["serde"], optional = true }
 clap = "*"
 csv = "*"
 encoding_rs_io = "*"
 log = "*"
-serde = {version = '*', features = ["derive"]}
+serde = { version = '*', features = ["derive"] }
 # serde_json = "*"
+
 
 [dev-dependencies]
 crossbeam-channel = "*"

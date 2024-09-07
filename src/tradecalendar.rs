@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Context, Result};
-use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Weekday};
 use csv::*;
 use encoding_rs_io::DecodeReaderBytes;
 use serde::{Deserialize, Serialize};
@@ -8,6 +7,36 @@ use std::fmt::Display;
 use std::fs::File;
 use std::path::Path;
 use std::result::Result::Ok;
+
+#[cfg(feature = "with-chrono")]
+use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Weekday};
+
+#[cfg(feature = "with-jiff")]
+use {
+    core::ops::SubAssign,
+    jiff::civil::{self, Date, DateTime, Time, Weekday},
+    jiff::{ToSpan, Unit},
+};
+
+use super::common::*;
+
+// #[cfg(feature = "with-chrono")]
+// pub type MyDateType = NaiveDate;
+
+// #[cfg(feature = "with-jiff")]
+// pub type MyDateType = Date;
+
+// #[cfg(feature = "with-chrono")]
+// pub type MyDateTimeType = NaiveDateTime;
+
+// #[cfg(feature = "with-jiff")]
+// pub type MyDateTimeType = DateTime;
+
+// #[cfg(feature = "with-chrono")]
+// pub type MyTimeType = NaiveTime;
+
+// #[cfg(feature = "with-jiff")]
+// pub type MyTimeType = Time;
 
 /// 如果搜索的时间点“不在”交易时段内, 如何返回交易日:
 ///
@@ -26,11 +55,11 @@ pub enum NotTradingSearchMethod {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Tradingday {
-    pub date: NaiveDate,
+    pub date: MyDateType,
     pub morning: bool,
     pub trading: bool,
     pub night: bool,
-    pub next: NaiveDate,
+    pub next: MyDateType,
 }
 
 impl Display for Tradingday {
@@ -38,7 +67,7 @@ impl Display for Tradingday {
         let dw = self.date.weekday();
         write!(
             f,
-            "{}, {}, {}, {}, {}, {}",
+            "{}, {:?}, {}, {}, {}, {}",
             self.date,
             dw,
             if self.morning { 1 } else { 0 },
@@ -51,7 +80,7 @@ impl Display for Tradingday {
 
 impl Tradingday {
     /// create a dummy object
-    pub fn new_dummy(date: &NaiveDate) -> Self {
+    pub fn new_dummy(date: &MyDateType) -> Self {
         Self {
             date: date.clone(),
             morning: false,
@@ -85,7 +114,7 @@ impl Tradingday {
 }
 
 /// 查找the_day在list(已排序)中的索引，及其左右值的索引，如果该索引无效，则为-1
-pub fn search_days(list: &[Tradingday], the_day: &NaiveDate) -> (isize, isize, isize) {
+pub fn search_days(list: &[Tradingday], the_day: &MyDateType) -> (isize, isize, isize) {
     if list.is_empty() {
         return (-1, -1, -1);
     }
@@ -133,14 +162,14 @@ pub fn search_days(list: &[Tradingday], the_day: &NaiveDate) -> (isize, isize, i
 
 /// 获取下一(num)个工作日,即非周六周日的日期
 /// 用于get_next_trading_day()失败之后，强制取工作日
-pub fn next_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
+pub fn next_working_day(the_day: &MyDateType, num: usize) -> MyDateType {
     assert!(num > 0);
 
     let mut next = the_day.clone();
     let mut numday = num;
 
     while numday > 0 {
-        next = next.succ_opt().expect("succ_opt");
+        next = tomorrow(&next);
         if is_working_day(&next) {
             numday -= 1;
         }
@@ -150,14 +179,14 @@ pub fn next_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
 
 /// 获取前一(num)个工作日,即非周六周日的日期
 /// 用于get_prev_trading_day()失败之后，强制取工作日
-pub fn prev_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
+pub fn prev_working_day(the_day: &MyDateType, num: usize) -> MyDateType {
     assert!(num > 0);
 
     let mut prev = the_day.clone();
     let mut numday = num;
 
     while numday > 0 {
-        prev = prev.pred_opt().expect("pred_opt");
+        prev = yesterday(&prev);
         if is_working_day(&prev) {
             numday -= 1;
         }
@@ -169,10 +198,13 @@ pub fn prev_working_day(the_day: &NaiveDate, num: usize) -> NaiveDate {
 /// 用于is_trading_day()失败后，判断是否工作日
 /// fail_safe一般都发生在新年初,年末忘记了更新calendar,导致取新一年的交易日失败
 /// 而我们知道，一月一号元旦，一定是休假的，所以这里可以把元旦避开
-fn is_working_day(the_day: &NaiveDate) -> bool {
+fn is_working_day(the_day: &MyDateType) -> bool {
     let week_day = the_day.weekday();
     let isfirst = the_day.month() == 1 && the_day.day() == 1;
+    #[cfg(feature = "with-chrono")]
     return week_day != Weekday::Sat && week_day != Weekday::Sun && !isfirst;
+    #[cfg(feature = "with-jiff")]
+    return week_day != Weekday::Saturday && week_day != Weekday::Sunday && !isfirst;
 }
 
 /// 内部是无状态的
@@ -185,7 +217,7 @@ pub trait TradingdayCache {
     fn get_trading_day_list(&self) -> &Vec<Tradingday>;
 
     /// 获取两个日期之间的交易日的slice, 包含这两个交易日, 超出范围的部分将被忽略
-    fn get_trading_day_slice(&self, start_dt: &NaiveDate, end_dt: &NaiveDate) -> &[Tradingday] {
+    fn get_trading_day_slice(&self, start_dt: &MyDateType, end_dt: &MyDateType) -> &[Tradingday] {
         if start_dt > end_dt {
             panic!("start_dt {} needs less than end_dt {}", start_dt, end_dt)
         };
@@ -207,7 +239,7 @@ pub trait TradingdayCache {
     }
 
     /// 获取两个日期之间的所有日期(含非交易日)的slice, 包含这两个日期, 超出范围的部分将被忽略
-    fn get_full_day_slice(&self, start_dt: &NaiveDate, end_dt: &NaiveDate) -> &[Tradingday] {
+    fn get_full_day_slice(&self, start_dt: &MyDateType, end_dt: &MyDateType) -> &[Tradingday] {
         if start_dt > end_dt {
             panic!("start_dt {} needs less than end_dt {}", start_dt, end_dt)
         };
@@ -230,7 +262,7 @@ pub trait TradingdayCache {
     }
 
     /// trade_day是否交易日
-    fn is_trading_day(&self, trade_day: &NaiveDate) -> Result<bool> {
+    fn is_trading_day(&self, trade_day: &MyDateType) -> Result<bool> {
         let list = self.get_trading_day_list();
         let (_, mid, _) = search_days(list, trade_day);
         if mid >= 0 {
@@ -240,7 +272,11 @@ pub trait TradingdayCache {
     }
 
     /// 获取后续第num个交易日, 要求num大于零
-    fn get_next_trading_day(&self, the_day: &NaiveDate, num: usize) -> anyhow::Result<&Tradingday> {
+    fn get_next_trading_day(
+        &self,
+        the_day: &MyDateType,
+        num: usize,
+    ) -> anyhow::Result<&Tradingday> {
         assert!(num > 0);
 
         // 由于trading_day_list数据较少，比直接查询full_day_list更快
@@ -256,7 +292,7 @@ pub trait TradingdayCache {
     }
 
     /// 获取之前的第num个交易日，要求num大于零
-    fn get_prev_trading_day(&self, the_day: &NaiveDate, num: usize) -> Result<&Tradingday> {
+    fn get_prev_trading_day(&self, the_day: &MyDateType, num: usize) -> Result<&Tradingday> {
         assert!(num > 0);
 
         let list = self.get_trading_day_list();
@@ -271,7 +307,7 @@ pub trait TradingdayCache {
     }
 
     /// 计算从start_date(含)到end_date(含)之间交易日的个数, 超出范围的部分将被忽略
-    fn get_trading_days_count(&self, start_dt: &NaiveDate, end_dt: &NaiveDate) -> usize {
+    fn get_trading_days_count(&self, start_dt: &MyDateType, end_dt: &MyDateType) -> usize {
         if start_dt > end_dt {
             panic!("start_dt {} needs less than end_dt {}", start_dt, end_dt)
         };
@@ -298,10 +334,10 @@ pub trait TradingdayCache {
     /// is_finance_item, 金融期货的下午收盘时间点为15:15, 其他商品15:00
     fn trading_day_by_datetime(
         &self,
-        input: &NaiveDateTime,
+        input: &MyDateTimeType,
         method: NotTradingSearchMethod,
         is_finance_item: bool,
-    ) -> Result<NaiveDate> {
+    ) -> Result<MyDateType> {
         let list = self.get_full_day_list();
         let date = input.date();
         let (_, index, _) = search_days(list, &date);
@@ -320,7 +356,10 @@ pub trait TradingdayCache {
         };
 
         let time = input.time();
+        #[cfg(feature = "with-chrono")]
         let secs = time.num_seconds_from_midnight();
+        #[cfg(feature = "with-jiff")]
+        let secs = time.since(Time::midnight()).unwrap().total(Unit::Second)? as i32;
         if secs < 3600 * 9 {
             // [0:00, 09:00)
             if tday.morning {
@@ -401,7 +440,7 @@ pub trait TradingdayCache {
         index: usize,
         tday: &Tradingday,
         method: NotTradingSearchMethod,
-    ) -> NaiveDate {
+    ) -> MyDateType {
         let res = match self.__fast_prev_trading_day(index) {
             Some(prev_tday) => {
                 if prev_tday.night {
@@ -429,27 +468,27 @@ pub trait TradingdayCache {
 /// 用来检测当前时间点是否交易, 及交易日切换的一些配置项
 struct TradingCheckConfig {
     /// 夜盘属于下一个交易日，这个变量指示什么时间点进行切换，一般是夜里19:00~20点，缺省19:30
-    pub tday_shift: NaiveTime,
+    pub tday_shift: MyTimeType,
 
     //-------------------- begin 以下几个字段用来判断接口是否应该处于连接状态
     /// 缺省夜里 20:30
-    pub _night_begin: NaiveTime,
+    pub _night_begin: MyTimeType,
     /// 缺省凌晨 2:31
-    pub _night_end: NaiveTime,
+    pub _night_end: MyTimeType,
     /// 缺省早上 8:30
-    pub _day_begin: NaiveTime,
+    pub _day_begin: MyTimeType,
     /// 缺省下午 15:30
-    pub _day_end: NaiveTime,
+    pub _day_end: MyTimeType,
     //-------------------- end
 }
 impl Default for TradingCheckConfig {
     fn default() -> Self {
         Self {
-            tday_shift: NaiveTime::from_hms_opt(19, 30, 0).expect("fromhms"),
-            _night_begin: NaiveTime::from_hms_opt(20, 30, 0).expect("fromhms"),
-            _night_end: NaiveTime::from_hms_opt(2, 31, 0).expect("fromhms"),
-            _day_begin: NaiveTime::from_hms_opt(8, 30, 0).expect("fromhms"),
-            _day_end: NaiveTime::from_hms_opt(15, 30, 0).expect("fromhms"),
+            tday_shift: make_time(19, 30, 0),
+            _night_begin: make_time(20, 30, 0),
+            _night_end: make_time(2, 31, 0),
+            _day_begin: make_time(8, 30, 0),
+            _day_end: make_time(15, 30, 0),
         }
     }
 }
@@ -467,14 +506,14 @@ pub struct TradeCalendar {
     trading_day_list: Vec<Tradingday>,
 
     /// 当前自然日及时间
-    current_time: NaiveDateTime,
+    current_time: MyDateTimeType,
     /// 当前时间点, 交易接口是否可连接（CTP服务器开放时段）
     is_trading: bool,
     cfg: TradingCheckConfig,
 
-    curr_tday: NaiveDate,
-    next_tday: NaiveDate,
-    prev_tday: NaiveDate,
+    curr_tday: MyDateType,
+    next_tday: MyDateType,
+    prev_tday: MyDateType,
 }
 
 impl TradingdayCache for TradeCalendar {
@@ -495,8 +534,8 @@ impl TradeCalendar {
         // current_time 同理,
         // 缺省值在1970年，其实也是可以的
         Self {
-            curr_tday: NaiveDate::MIN,
-            current_time: NaiveDateTime::MIN,
+            curr_tday: MyDateType::MIN,
+            current_time: MyDateTimeType::MIN,
             ..Default::default()
         }
     }
@@ -507,22 +546,22 @@ impl TradeCalendar {
     }
 
     /// 前一交易日
-    pub fn prev_tday(&self) -> &NaiveDate {
+    pub fn prev_tday(&self) -> &MyDateType {
         &self.prev_tday
     }
 
     /// 获取当前交易日
-    pub fn current_tday(&self) -> &NaiveDate {
+    pub fn current_tday(&self) -> &MyDateType {
         &self.curr_tday
     }
 
     /// 后一交易日
-    pub fn next_tday(&self) -> &NaiveDate {
+    pub fn next_tday(&self) -> &MyDateType {
         &self.next_tday
     }
 
     /// 获取最近设置的自然日(区别于交易日)及其时间，可用于回溯模式
-    pub fn current_time(&self) -> &NaiveDateTime {
+    pub fn current_time(&self) -> &MyDateTimeType {
         &self.current_time
     }
 
@@ -542,15 +581,13 @@ impl TradeCalendar {
     /// day_end: 缺省值 15:30:00
     pub fn set_config(
         &mut self,
-        tday_shift: &NaiveTime,
-        night_begin: &NaiveTime,
-        night_end: &NaiveTime,
-        day_begin: &NaiveTime,
-        day_end: &NaiveTime,
+        tday_shift: &MyTimeType,
+        night_begin: &MyTimeType,
+        night_end: &MyTimeType,
+        day_begin: &MyTimeType,
+        day_end: &MyTimeType,
     ) -> Result<()> {
-        if tday_shift >= &NaiveTime::from_hms_opt(21, 0, 0).expect("fromhms")
-            || tday_shift <= &NaiveTime::from_hms_opt(16, 0, 0).expect("fromhms")
-        {
+        if tday_shift >= &make_time(21, 0, 0) || tday_shift <= &make_time(16, 0, 0) {
             return Err(anyhow!("TradeCalendar: `tday_shift`一般在夜里19~20."));
         }
         if night_begin < day_end {
@@ -595,10 +632,13 @@ impl TradeCalendar {
     /// 仅用于回溯模式
     ///
     /// 重置内部状态，以便重新开始
-    pub fn reset(&mut self, start_time: Option<&NaiveDateTime>) -> Result<()> {
+    pub fn reset(&mut self, start_time: Option<&MyDateTimeType>) -> Result<()> {
         let td = &self.full_day_list[0];
+        #[cfg(feature = "with-chrono")]
         let current_time = td.date.and_hms_opt(0, 0, 0).expect("andhms");
-        self.curr_tday = NaiveDate::MIN;
+        #[cfg(feature = "with-jiff")]
+        let current_time = td.date.at(0, 0, 0, 0);
+        self.curr_tday = MyDateType::MIN;
         self.time_changed(start_time.unwrap_or(&current_time), true)?;
         Ok(())
     }
@@ -611,9 +651,15 @@ impl TradeCalendar {
     ///    
     pub fn time_changed(
         &mut self,
-        datetime: &NaiveDateTime,
+        datetime: &MyDateTimeType,
         fail_safe: bool,
-    ) -> Result<(NaiveDate, NaiveDate, NaiveDate, NaiveDate, Option<String>)> {
+    ) -> Result<(
+        MyDateType,
+        MyDateType,
+        MyDateType,
+        MyDateType,
+        Option<String>,
+    )> {
         // println!("time_changed() called.");
         let curr_date = datetime.date();
         let old_date = self.current_time.date();
@@ -707,7 +753,7 @@ impl TradeCalendar {
     }
 
     /// 重算is_trading变量, 当前Tradingday已知
-    fn check_is_trading(&self, time: &NaiveTime, tday: &Tradingday) -> bool {
+    fn check_is_trading(&self, time: &MyTimeType, tday: &Tradingday) -> bool {
         if time >= &self.cfg._night_begin {
             return tday.night;
         }
@@ -728,7 +774,7 @@ impl TradeCalendar {
     }
 
     /// 已经超出了full_day_list的范围, 只能按照working day的方式, 构造一个范围外的Tradingday
-    fn fail_safe_tradingday(&mut self, input: &NaiveDate) -> Tradingday {
+    fn fail_safe_tradingday(&mut self, input: &MyDateType) -> Tradingday {
         // 需要构造出一个Tradingday对象出来
         let weekday = input.weekday();
         let mut calendar = Tradingday::new_dummy(&input);
@@ -741,6 +787,7 @@ impl TradeCalendar {
         // 一般白天有交易时都会有早盘，除了以下三种情况
         calendar.morning = calendar.trading;
         // 1) 周五的夜盘持续到周六早上，但周六白天不交易
+        #[cfg(feature = "with-chrono")]
         if weekday == Weekday::Sat {
             calendar.morning = true;
         }
@@ -748,19 +795,44 @@ impl TradeCalendar {
         else if weekday == Weekday::Mon {
             calendar.morning = false;
         }
+
+        #[cfg(feature = "with-jiff")]
+        if weekday == Weekday::Saturday {
+            calendar.morning = true;
+        }
+        // 2) 周一白天有交易，但显然没有早盘
+        else if weekday == Weekday::Monday {
+            calendar.morning = false;
+        }
+
         // 3) 从公共假期到input之间，没有工作日的话，则没有早盘， 因为放假前一天没有夜盘的。
         // 这里能确定的假日就是元旦，五一国庆当然也能确定，但五一国庆的时候肯定已经更新交易日历了吧，
         // 所以这里只检查元旦就OK了
         if calendar.morning {
-            let first_day = NaiveDate::from_ymd_opt(input.year(), 1, 1).unwrap();
-            let mut theday = input.clone() - chrono::Duration::days(1);
+            let first_day = make_date(input.year(), 1, 1);
+
+            #[cfg(feature = "with-chrono")]
+            let mut theday = *input - Duration::days(1);
+
+            #[cfg(feature = "with-jiff")]
+            let mut theday = *input - 1.days();
+
             let mut has_working_day = false;
             while theday > first_day {
                 if is_working_day(&theday) {
                     has_working_day = true;
                     break;
                 }
-                theday -= chrono::Duration::days(1);
+
+                #[cfg(feature = "with-chrono")]
+                {
+                    theday -= Duration::days(1);
+                }
+                #[cfg(feature = "with-jiff")]
+                {
+                    // theday -= 1.days();
+                    theday.sub_assign(1.days());
+                }
             }
             if !has_working_day {
                 calendar.morning = false;
@@ -782,6 +854,7 @@ mod tests {
 
     #[test]
     #[allow(unused_variables)]
+    #[cfg(feature = "with-chrono")]
     fn test_calendar() -> anyhow::Result<()> {
         let buf = "date,morning,trading,night,next
 2021-01-01,false,false,false,2021-01-04
@@ -826,23 +899,23 @@ mod tests {
         // 实际情况是2022年的公共假日在2021年12月左右公布，2022-01-03是节假日, 这个位置正确的值是2022-01-04
         // 不更新交易日历，仅通过fail_safe，是无法修正这个数据的
 
-        let y20201230 = NaiveDate::from_ymd_opt(2020, 12, 30).expect("chrono");
-        let y20201231 = NaiveDate::from_ymd_opt(2020, 12, 31).expect("chrono");
-        let y20210101 = NaiveDate::from_ymd_opt(2021, 1, 1).expect("chrono");
-        let y20210102 = NaiveDate::from_ymd_opt(2021, 1, 2).expect("chrono");
-        let y20210104 = NaiveDate::from_ymd_opt(2021, 1, 4).expect("chrono");
-        let y20210105 = NaiveDate::from_ymd_opt(2021, 1, 5).expect("chrono");
-        let y20210108 = NaiveDate::from_ymd_opt(2021, 1, 8).expect("chrono");
-        let y20210111 = NaiveDate::from_ymd_opt(2021, 1, 11).expect("chrono");
-        let y20210120 = NaiveDate::from_ymd_opt(2021, 1, 20).expect("chrono");
-        let y20210121 = NaiveDate::from_ymd_opt(2021, 1, 21).expect("chrono");
-        let y20210202 = NaiveDate::from_ymd_opt(2021, 2, 2).expect("chrono");
-        let y20211231 = NaiveDate::from_ymd_opt(2021, 12, 31).expect("chrono");
-        let y20220101 = NaiveDate::from_ymd_opt(2022, 1, 1).expect("chrono");
-        let y20220102 = NaiveDate::from_ymd_opt(2022, 1, 2).expect("chrono");
-        let y20220103 = NaiveDate::from_ymd_opt(2022, 1, 3).expect("chrono");
-        let y20220104 = NaiveDate::from_ymd_opt(2022, 1, 4).expect("chrono");
-        let y20240101 = NaiveDate::from_ymd_opt(2024, 1, 1).expect("chrono");
+        let y20201230 = make_date(2020, 12, 30);
+        let y20201231 = make_date(2020, 12, 31);
+        let y20210101 = make_date(2021, 1, 1);
+        let y20210102 = make_date(2021, 1, 2);
+        let y20210104 = make_date(2021, 1, 4);
+        let y20210105 = make_date(2021, 1, 5);
+        let y20210108 = make_date(2021, 1, 8);
+        let y20210111 = make_date(2021, 1, 11);
+        let y20210120 = make_date(2021, 1, 20);
+        let y20210121 = make_date(2021, 1, 21);
+        let y20210202 = make_date(2021, 2, 2);
+        let y20211231 = make_date(2021, 12, 31);
+        let y20220101 = make_date(2022, 1, 1);
+        let y20220102 = make_date(2022, 1, 2);
+        let y20220103 = make_date(2022, 1, 3);
+        let y20220104 = make_date(2022, 1, 4);
+        let y20240101 = make_date(2024, 1, 1);
 
         let list = Tradingday::load_csv_read(buf.as_bytes())?;
         // println!("{:?}", list);
@@ -853,11 +926,11 @@ mod tests {
 
         let mut mgr = TradeCalendar::new();
         mgr.set_config(
-            &NaiveTime::from_hms_opt(19, 30, 0).expect("fromhms"),
-            &NaiveTime::from_hms_opt(20, 30, 0).expect("fromhms"),
-            &NaiveTime::from_hms_opt(2, 31, 0).expect("fromhms"),
-            &NaiveTime::from_hms_opt(8, 30, 0).expect("fromhms"),
-            &NaiveTime::from_hms_opt(15, 30, 0).expect("fromhms"),
+            &make_time(19, 30, 0),
+            &make_time(20, 30, 0),
+            &make_time(2, 31, 0),
+            &make_time(8, 30, 0),
+            &make_time(15, 30, 0),
         )?;
 
         mgr.reload(list)?;
@@ -981,7 +1054,7 @@ mod tests {
         let start = y20210120.and_hms_opt(18, 22, 0).expect("chrono");
         mgr.reset(Some(&start))?;
         assert_eq!(mgr.current_tday(), &y20210120);
-        let start = NaiveDateTime::from_str("2021-01-20T20:22:00").expect("chrono");
+        let start = MyDateTimeType::from_str("2021-01-20T20:22:00").expect("chrono");
         mgr.reset(Some(&start))?;
         assert_eq!(mgr.current_tday(), &y20210121);
         Ok(())
