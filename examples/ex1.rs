@@ -7,6 +7,7 @@ use chrono::{Local, NaiveDateTime};
 #[cfg(feature = "with-jiff")]
 use jiff::{civil::DateTime, Zoned};
 
+use tradecalendar::common::*;
 use tradecalendar::{TradeCalendar, Tradingday, TradingdayCache};
 
 fn ctrl_channel() -> Result<Receiver<()>, ctrlc::Error> {
@@ -45,8 +46,8 @@ fn main() -> Result<()> {
         prev_tday.date, next_tday.date
     );
     let next_10_tday = calendar.get_next_trading_day(&today, 10)?;
-    let tomorrow = tomorrow(&today);
-    let tday_slice = calendar.get_trading_day_slice(&tomorrow, &next_10_tday.date);
+    let tomorrow_ = tomorrow(&today);
+    let tday_slice = calendar.get_trading_day_slice(&tomorrow_, &next_10_tday.date);
     println!("next 10 tradingdays will be");
     for tday in tday_slice {
         print!("{} ", tday.date);

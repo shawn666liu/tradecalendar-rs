@@ -9,34 +9,16 @@ use std::path::Path;
 use std::result::Result::Ok;
 
 #[cfg(feature = "with-chrono")]
-use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Weekday};
+use chrono::{Datelike, Duration, Timelike, Weekday};
 
 #[cfg(feature = "with-jiff")]
 use {
-    jiff::civil::{self, Date, DateTime, Time, Weekday},
+    jiff::civil::{Time, Weekday},
     jiff::{ToSpan, Unit},
     std::ops::SubAssign,
 };
 
 use super::common::*;
-
-// #[cfg(feature = "with-chrono")]
-// pub type MyDateType = NaiveDate;
-
-// #[cfg(feature = "with-jiff")]
-// pub type MyDateType = Date;
-
-// #[cfg(feature = "with-chrono")]
-// pub type MyDateTimeType = NaiveDateTime;
-
-// #[cfg(feature = "with-jiff")]
-// pub type MyDateTimeType = DateTime;
-
-// #[cfg(feature = "with-chrono")]
-// pub type MyTimeType = NaiveTime;
-
-// #[cfg(feature = "with-jiff")]
-// pub type MyTimeType = Time;
 
 /// 如果搜索的时间点“不在”交易时段内, 如何返回交易日:
 ///

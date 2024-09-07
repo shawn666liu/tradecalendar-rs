@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::{fs::File, io::Write, path::Path};
 
 #[cfg(feature = "with-chrono")]
-use chrono::{Datelike, Duration, NaiveDate, Weekday};
+use chrono::{Datelike, Duration, Weekday};
 
 #[cfg(feature = "with-jiff")]
 use {
