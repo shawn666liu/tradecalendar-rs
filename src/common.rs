@@ -63,3 +63,13 @@ pub fn yesterday(date: &MyDateType) -> MyDateType {
 pub fn yesterday(date: &MyDateType) -> MyDateType {
     return date.yesterday().unwrap();
 }
+
+#[cfg(feature = "with-chrono")]
+pub fn date_at_hms(date: &MyDateType, hour: u32, min: u32, sec: u32) -> MyDateTimeType {
+    return date.and_hms_opt(hour, min, sec).unwrap();
+}
+
+#[cfg(feature = "with-jiff")]
+pub fn date_at_hms(date: &MyDateType, hour: i8, minute: i8, second: i8) -> MyDateTimeType {
+    return date.at(hour, minute, second, 0);
+}

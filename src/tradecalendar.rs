@@ -616,10 +616,7 @@ impl TradeCalendar {
     /// 重置内部状态，以便重新开始
     pub fn reset(&mut self, start_time: Option<&MyDateTimeType>) -> Result<()> {
         let td = &self.full_day_list[0];
-        #[cfg(feature = "with-chrono")]
-        let current_time = td.date.and_hms_opt(0, 0, 0).expect("andhms");
-        #[cfg(feature = "with-jiff")]
-        let current_time = td.date.at(0, 0, 0, 0);
+        let current_time = date_at_hms(&td.date, 0, 0, 0);
         self.curr_tday = MyDateType::MIN;
         self.time_changed(start_time.unwrap_or(&current_time), true)?;
         Ok(())
@@ -836,7 +833,6 @@ mod tests {
 
     #[test]
     #[allow(unused_variables)]
-    #[cfg(feature = "with-chrono")]
     fn test_calendar() -> anyhow::Result<()> {
         let buf = "date,morning,trading,night,next
 2021-01-01,false,false,false,2021-01-04
@@ -931,7 +927,7 @@ mod tests {
         let td = mgr.get_prev_trading_day(&y20210108, 3)?;
         assert_eq!(td.date, y20210105);
 
-        let datetime = y20210105.and_hms_opt(9, 10, 5).unwrap();
+        let datetime = date_at_hms(&y20210105, 9, 10, 5);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, false)?;
         assert_ne!(old_date, curr_date);
@@ -939,14 +935,14 @@ mod tests {
         assert!(opt_err.is_none());
         assert_eq!(mgr.is_trading(), true);
 
-        let datetime = y20210108.and_hms_opt(19, 28, 30).unwrap();
+        let datetime = date_at_hms(&y20210108, 19, 28, 30);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, false)?;
         assert_ne!(old_tday, curr_tday);
         assert_eq!(mgr.current_tday(), &y20210108);
         assert_eq!(mgr.is_trading(), false);
 
-        let datetime = y20210108.and_hms_opt(19, 29, 30).unwrap();
+        let datetime = date_at_hms(&y20210108, 19, 29, 30);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, false)?;
         assert_eq!(old_date, curr_date);
@@ -954,14 +950,14 @@ mod tests {
         assert_eq!(mgr.current_tday(), &y20210108);
         assert_eq!(mgr.is_trading(), false);
 
-        let datetime = y20210108.and_hms_opt(19, 30, 0).unwrap();
+        let datetime = date_at_hms(&y20210108, 19, 30, 0);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, false)?;
         assert_ne!(old_tday, curr_tday);
         assert_eq!(mgr.current_tday(), &y20210111);
         assert_eq!(mgr.is_trading(), false);
 
-        let datetime = y20210108.and_hms_opt(20, 30, 0).unwrap();
+        let datetime = date_at_hms(&y20210108, 20, 30, 0);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, false)?;
         assert_eq!(old_tday, curr_tday);
@@ -969,7 +965,7 @@ mod tests {
         assert_eq!(mgr.is_trading(), true);
 
         // 中间数据缺失
-        let datetime = y20210202.and_hms_opt(0, 0, 0).unwrap();
+        let datetime = date_at_hms(&y20210202, 0, 0, 0);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, true)?;
         assert!(opt_err.is_some());
@@ -979,7 +975,7 @@ mod tests {
         // fail_safe
 
         // missing before, 这种情况在实盘一般是不会出现的，因为日期总是向后推进，不会向前
-        let datetime = y20201230.and_hms_opt(20, 30, 0).unwrap();
+        let datetime = date_at_hms(&y20201230, 20, 30, 0);
         let res = mgr.time_changed(&datetime, false);
         assert!(res.is_err());
 
@@ -991,7 +987,7 @@ mod tests {
         assert_eq!(mgr.is_trading(), true);
 
         // missing after, 实盘可能遭遇这种情况,
-        let datetime = y20211231.and_hms_opt(10, 30, 0).unwrap();
+        let datetime = date_at_hms(&y20211231, 10, 30, 0);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, true)?;
         // println!(
@@ -1000,7 +996,7 @@ mod tests {
         // );
 
         // 由于12月31日后面是元旦，是假期， 所以12月31日没有夜盘，交易日是不会切换的
-        let datetime = y20211231.and_hms_opt(21, 30, 0).unwrap();
+        let datetime = date_at_hms(&y20211231, 21, 30, 0);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, true)?;
         // println!(
@@ -1011,7 +1007,7 @@ mod tests {
         assert_eq!(mgr.current_tday(), &y20211231);
         assert_eq!(mgr.is_trading(), false);
 
-        // let mut datetime = y20240101.and_hms_opt(0, 30, 0).unwrap();
+        // let mut datetime = date_at_hms(&y20240101,0, 30, 0);
         // for idx in 1..=50 {
         //     datetime += chrono::Duration::hours(3);
         //     let (old_tday, curr_tday, old_date, curr_date, opt_err) =
@@ -1030,10 +1026,13 @@ mod tests {
         // }
 
         // 仅能判断出2024-01-02没有凌晨盘，但无法确定2024-01-02是否节假日
+        #[cfg(feature = "with-chrono")]
         let tday = mgr.fail_safe_tradingday(&(y20240101 + chrono::Duration::days(1)));
+        #[cfg(feature = "with-jiff")]
+        let tday = mgr.fail_safe_tradingday(&(y20240101 + 1.days()));
         assert!(!tday.morning);
 
-        let start = y20210120.and_hms_opt(18, 22, 0).expect("chrono");
+        let start = date_at_hms(&y20210120, 18, 22, 0);
         mgr.reset(Some(&start))?;
         assert_eq!(mgr.current_tday(), &y20210120);
         let start = MyDateTimeType::from_str("2021-01-20T20:22:00").expect("chrono");
