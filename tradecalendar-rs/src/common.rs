@@ -73,3 +73,14 @@ pub fn date_at_hms(date: &MyDateType, hour: u32, min: u32, sec: u32) -> MyDateTi
 pub fn date_at_hms(date: &MyDateType, hour: i8, minute: i8, second: i8) -> MyDateTimeType {
     return date.at(hour, minute, second, 0);
 }
+
+#[cfg(feature = "with-chrono")]
+pub fn get_now() -> NaiveDateTime {
+    use chrono::Local;
+    Local::now().naive_local()
+}
+#[cfg(feature = "with-jiff")]
+pub fn get_now() -> DateTime {
+    use jiff::Zoned;
+    Zoned::now().datetime()
+}
