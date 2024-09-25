@@ -24,14 +24,17 @@ encoding_rs_io = "*"
 log = "*"
 serde = { version = '*', features = ["derive"] }
 # serde_json = "*"
-connectorx = { version = "0.3", features = [
+connectorx = { version = "0.3.3", features = [
     "src_mysql",
     # "src_mssql",
     "src_postgres",
     "src_sqlite",
-    "dst_arrow2",
+    "dst_arrow",
 ] }
-arrow2 = { version = "*" }
+# 注意: 这个version必须要跟connectorx引用的arrow版本一致
+# 从connectorx项目的Cargo.toml文件里面获取
+arrow = { version = "46.0.0" }
+
 
 [dev-dependencies]
 crossbeam-channel = "*"

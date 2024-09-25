@@ -1,17 +1,20 @@
 use anyhow::{anyhow, Result};
-// use connectorx::get_arrow2;
-use arrow2::array::{Array, PrimitiveArray};
-use arrow2::types::NativeType;
-use connectorx::{get_arrow2::get_arrow2, source_router::SourceConn, sql::CXQuery};
-use std::any::type_name;
+use arrow::array::{Array, BooleanArray, Date32Array, Int64Array};
+use arrow::datatypes::DataType;
+// use arrow_array::{Array, BooleanArray, Date32Array, Int64Array};
+// use arrow_schema::DataType;
+use connectorx::{get_arrow::get_arrow, source_router::SourceConn, sql::CXQuery};
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 use crate::common::MyDateType;
 use crate::tradecalendar::Tradingday;
 
 #[cfg(feature = "with-chrono")]
 pub fn date_from_i32(days: i32) -> MyDateType {
-    return arrow2::temporal_conversions::date32_to_date(days);
+    return arrow::temporal_conversions::date32_to_datetime(days)
+        .unwrap()
+        .date();
 }
 
 #[cfg(feature = "with-jiff")]
@@ -19,8 +22,8 @@ pub fn date_from_i32(days: i32) -> MyDateType {
     use jiff::civil::Date;
     // Date::from_unix_epoch_days(days)
 
-    const DAYS_FROM_0000_01_01_TO_1970_01_01: i64 = 719_468;
-    const DAYS_IN_ERA: i64 = 146_097;
+    let DAYS_FROM_0000_01_01_TO_1970_01_01: i64 = 719_468;
+    let DAYS_IN_ERA: i64 = 146_097;
     let days: i64 = days.into();
 
     let days = days + DAYS_FROM_0000_01_01_TO_1970_01_01;
@@ -42,79 +45,110 @@ pub fn date_from_i32(days: i32) -> MyDateType {
 
 /// load Tradingday from db
 /// conn format:  
-/// 1) postgresql://user:passwd@localhost:5432/dbname
-/// 2) clickhouse://user:passwd@localhost:5432/dbname
+/// 1) postgres://user:passwd@localhost:5432/dbname
+/// 2) mysql://user:passwd@localhost:3306/dbname
 ///
-/// query: 5 fields required:
+/// query: 5 fields required, keep the order of feilds,
 /// select date,morning,trading,night,next from your_table where xxx order by date;
-pub fn load_calendar(conn: &str, query: &str, proto: Option<String>) -> Result<Vec<Tradingday>> {
+pub fn load_tradingdays(conn: &str, query: &str, proto: Option<String>) -> Result<Vec<Tradingday>> {
     let mut source_conn = SourceConn::try_from(conn)?;
     if let Some(mode) = proto {
         source_conn.proto = mode;
     }
     let queries = &[CXQuery::from(query)];
-    let destination = get_arrow2(&source_conn, None, queries)?;
-    let (data, schema) = destination.arrow()?;
-    print!("schema {:?}\n", schema);
-    let total = data.iter().fold(0, |acc, x| acc + x.len());
+    let destination = get_arrow(&source_conn, None, queries)?;
+    let data = destination.arrow()?;
+    let total = data.iter().fold(0, |acc, x| acc + x.num_rows());
     let mut res = Vec::with_capacity(total);
     for chunk in data.iter() {
-        let len = chunk.len();
-        let arrarys = chunk.arrays();
-        if arrarys.len() != 5 {
-            return Err(anyhow!("sql查询结果必须是5个字段,且保证顺序"));
-        }
-        let tdays = cast_to_primitive::<i32>(arrarys, 0)?;
-        let morning = cast_to_primitive::<i64>(arrarys, 1)?;
-        let trading = cast_to_primitive::<i64>(arrarys, 2)?;
-        let night = cast_to_primitive::<i64>(arrarys, 3)?;
-        let next = cast_to_primitive::<i32>(arrarys, 4)?;
+        let schema = chunk.schema();
+        println!("{:#?}", schema);
 
-        for idx in 0..len {
-            let days = tdays.get(idx).ok_or_else(|| anyhow!("cast date"))?;
-            let nxdays = next.get(idx).ok_or_else(|| anyhow!("cast nex"))?;
-            let rec = Tradingday {
-                date: date_from_i32(days),
-                morning: morning.get(idx).ok_or_else(|| anyhow!("cast morning"))? > 0,
-                trading: trading.get(idx).ok_or_else(|| anyhow!("cast trading"))? > 0,
-                night: night.get(idx).ok_or_else(|| anyhow!("cast night"))? > 0,
-                next: date_from_i32(nxdays),
-            };
-            res.push(rec);
+        // clickhouse没有bool类型,读取到的是i64,所以这里要判断是否boolean类型
+        if schema.fields.len() != 5 {
+            return Err(anyhow!("sql查询结果必须是5个字段,且保证顺序"));
+        };
+        let morning_fld = &schema.fields[1];
+        let is_bool = morning_fld.data_type() == &DataType::Boolean;
+        println!("is_bool: {}", is_bool);
+
+        let arrarys = chunk.columns();
+        let tdays = cast_to_concret_array::<Date32Array>(&arrarys[0], 0)?;
+        let next = cast_to_concret_array::<Date32Array>(&arrarys[4], 4)?;
+
+        let len = chunk.num_rows();
+        if is_bool {
+            let morning = cast_to_concret_array::<BooleanArray>(&arrarys[1], 1)?;
+            let trading = cast_to_concret_array::<BooleanArray>(&arrarys[2], 2)?;
+            let night = cast_to_concret_array::<BooleanArray>(&arrarys[3], 3)?;
+
+            for idx in 0..len {
+                let days = tdays.value(idx);
+                let nxdays = next.value(idx);
+                let rec = Tradingday {
+                    date: date_from_i32(days),
+                    morning: morning.value(idx),
+                    trading: trading.value(idx),
+                    night: night.value(idx),
+                    next: date_from_i32(nxdays),
+                };
+                res.push(rec);
+            }
+        } else {
+            // let type_: &DataType = schema.fields[1].data_type();
+            let morning = cast_to_concret_array::<Int64Array>(&arrarys[1], 1)?;
+            let trading = cast_to_concret_array::<Int64Array>(&arrarys[2], 2)?;
+            let night = cast_to_concret_array::<Int64Array>(&arrarys[3], 3)?;
+
+            for idx in 0..len {
+                let days = tdays.value(idx);
+                let nxdays = next.value(idx);
+                let rec = Tradingday {
+                    date: date_from_i32(days),
+                    morning: morning.value(idx) > 0,
+                    trading: trading.value(idx) > 0,
+                    night: night.value(idx) > 0,
+                    next: date_from_i32(nxdays),
+                };
+                res.push(rec);
+            }
         }
     }
 
     Ok(res)
 }
 
-pub fn cast_to_primitive<T: NativeType>(
-    arrarys: &[Box<dyn Array>],
-    index: usize,
-) -> Result<&PrimitiveArray<T>> {
-    let dyn_any = &arrarys[index];
-    let primitive_array = dyn_any
-        .as_any()
-        .downcast_ref::<PrimitiveArray<T>>()
-        .ok_or_else(|| anyhow!("cannot cast field_0 to {}", std::any::type_name::<T>()))?;
-    Ok(primitive_array)
+fn cast_to_concret_array<T: 'static>(arrary: &Arc<dyn Array>, index: usize) -> Result<&T> {
+    let concret_array = arrary.as_any().downcast_ref::<T>().ok_or_else(|| {
+        anyhow!(
+            "cannot cast col_{} to {}",
+            index,
+            std::any::type_name::<T>()
+        )
+    })?;
+    Ok(concret_array)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_db_read() -> Result<()> {
-        // let conn = "postgresql://admin:Intel%40123@129.211.121.22:5432/futurebars";
-        // let conn = "mysql://readonly:readonly@192.168.9.122:9004/futuredb";
-
-        // let conn = "postgres://readonly:readonly@192.168.9.122:9005/futuredb";
-        let conn = "mysql://readonly:readonly@192.168.100.208:9004/futuredb";
-        let query = "select * from calendar limit 10";
-        let res = load_calendar(conn, query, Some("text".into()))?;
-        for td in res.iter() {
-            print!("{:?}\n", td);
-        }
-        Ok(())
-    }
-}
+// fn to_bool_array(array: Arc<dyn Array>) -> Result<BooleanArray> {
+//     let data_type = array.data_type();
+//     match data_type {
+//         DataType::Boolean => {
+//             let x = Arc::get_mut(array);
+//             let array_ = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+//             return Ok(array_);
+//         }
+//         DataType::Int64 => {
+//             let values = array
+//                 .as_any()
+//                 .downcast_ref::<Int64Array>()
+//                 .unwrap()
+//                 .values()
+//                 .iter()
+//                 .map(|v| *v > 0)
+//                 .collect::<Vec<_>>();
+//             let res = BooleanArray::from(values);
+//             return Ok(res);
+//         }
+//         _ => return Err(anyhow!("")),
+//     }
+// }

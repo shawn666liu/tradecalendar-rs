@@ -6,9 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "tradecalendarpy"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+tradecalendar = { version = "*", path = "../tradecalendar-rs", default-features = false, features = [
+    "with-chrono",
+] }
 anyhow = "*"
-tradecalendar = { version = "*", path = "../tradecalendar-rs" }
-pyo3 = { version = "0.22.2", features = ["extension-module"] }
+# pyo3的版本受到pyo3-stub-gen的限制
+pyo3 = { version = "^0.21.0", features = [
+    "extension-module",
+    "gil-refs",
+    "chrono",
+] }
+chrono = "0.4"
+pyo3-stub-gen = { version = "*", git = "https://github.com/Jij-Inc/pyo3-stub-gen.git" }
+# pyo3-stub-gen = { version = "^0.6.0", features = ["chrono"] }
