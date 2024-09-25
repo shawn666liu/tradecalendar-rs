@@ -34,7 +34,7 @@ fn main() -> Result<()> {
     for tday in tday_slice {
         print!("{} ", tday.date);
     }
-    println!("");
+    println!("\nevery 60 seconds timer started, or press Ctrl+C to exit\n");
 
     let _ = calendar.time_changed(&now, true)?;
     let mut trading = calendar.is_trading();
