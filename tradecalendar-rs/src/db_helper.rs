@@ -7,41 +7,8 @@ use connectorx::{get_arrow::get_arrow, source_router::SourceConn, sql::CXQuery};
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::common::MyDateType;
+use crate::time_helper::date_from_i32;
 use crate::tradecalendar::Tradingday;
-
-#[cfg(feature = "with-chrono")]
-pub fn date_from_i32(days: i32) -> MyDateType {
-    return arrow::temporal_conversions::date32_to_datetime(days)
-        .unwrap()
-        .date();
-}
-
-#[cfg(feature = "with-jiff")]
-pub fn date_from_i32(days: i32) -> MyDateType {
-    use jiff::civil::Date;
-    // Date::from_unix_epoch_days(days)
-
-    let DAYS_FROM_0000_01_01_TO_1970_01_01: i64 = 719_468;
-    let DAYS_IN_ERA: i64 = 146_097;
-    let days: i64 = days.into();
-
-    let days = days + DAYS_FROM_0000_01_01_TO_1970_01_01;
-    let era = days / DAYS_IN_ERA;
-    let day_of_era = days % DAYS_IN_ERA;
-    let year_of_era = (day_of_era - day_of_era / (1_460) + day_of_era / (36_524)
-        - day_of_era / (DAYS_IN_ERA - (1)))
-        / (365);
-    let year = year_of_era + era * (400);
-    let day_of_year = day_of_era - ((365) * year_of_era + year_of_era / (4) - year_of_era / (100));
-    let month = (day_of_year * (5) + (2)) / (153);
-    let day = day_of_year - ((153) * month + (2)) / (5) + (1);
-
-    let month = if month < 10 { month + (3) } else { month - (9) };
-    let year = if month <= 2 { year + (1) } else { year };
-
-    Date::constant(year as i16, month as i8, day as i8)
-}
 
 /// load Tradingday from db
 /// conn format:  

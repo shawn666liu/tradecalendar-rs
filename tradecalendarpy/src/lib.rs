@@ -1,5 +1,4 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use pyo3::chrono::*;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::Python;
@@ -9,10 +8,6 @@ use pyo3_stub_gen::{
     derive::gen_stub_pymethods,
 };
 
-use chrono::Datelike;
-
-use tradecalendar::common::make_date;
-use tradecalendar::Tradingday;
 use tradecalendar::{self, get_buildin_calendar, get_calendar, get_csv_calendar, TradingdayCache};
 
 use tradecalendar::TradeCalendar as RsCalendar;
