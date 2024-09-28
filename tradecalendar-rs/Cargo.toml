@@ -13,6 +13,7 @@ with-jiff = ["jiff"]
 
 # cargo build --features "with-jiff"
 # cargo build --features "with-chrono" --no-default-features
+# in Cargo.toml, should use "default-features = false"
 
 [dependencies]
 anyhow = "*"
