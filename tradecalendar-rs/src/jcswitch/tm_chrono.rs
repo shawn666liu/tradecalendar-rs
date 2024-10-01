@@ -1,3 +1,4 @@
+// use anyhow::{anyhow, Result};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 
 pub type MyDateType = NaiveDate;
@@ -29,10 +30,15 @@ pub fn get_now() -> MyDateTimeType {
     Local::now().naive_local()
 }
 
-pub fn date_from_i32(days: i32) -> MyDateType {
-    use chrono::DateTime;
-    return DateTime::from_timestamp(days as i64 * 86_400, 0)
-        .unwrap()
-        .naive_utc()
-        .date();
+pub fn date_from_i32(days_since_epoch: i32) -> MyDateType {
+    // 1970年1月1日是公元1年之后的第719,163天。
+    let days_from_ce = days_since_epoch + 719163;
+    // 从天数创建日期。
+    NaiveDate::from_num_days_from_ce_opt(days_from_ce).unwrap()
+    // .ok_or_else(|| {
+    //     anyhow!(
+    //         "days_since_epoch({}), convert to date failed",
+    //         days_since_epoch
+    //     )
+    // })?
 }

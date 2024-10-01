@@ -1,3 +1,3 @@
 [workspace]
-members = ["tradecalendar-rs", "tradecalendarpy"]
+members = ["tradecalendar-rs", "tradecalendarpp", "tradecalendarpy"]
 resolver = "2"

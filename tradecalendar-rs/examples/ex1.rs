@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossbeam_channel::{bounded, select, tick, Receiver};
 use std::time::Duration;
 
-use tradecalendar::{get_buildin_calendar, time_helper::*};
+use tradecalendar::{get_buildin_calendar, jcswitch::*};
 use tradecalendar::{TradeCalendar, TradingdayCache};
 
 fn ctrl_channel() -> Result<Receiver<()>, ctrlc::Error> {

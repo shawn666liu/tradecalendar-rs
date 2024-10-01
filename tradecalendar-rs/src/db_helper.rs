@@ -7,7 +7,7 @@ use connectorx::{get_arrow::get_arrow, source_router::SourceConn, sql::CXQuery};
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::time_helper::date_from_i32;
+use crate::jcswitch::date_from_i32;
 use crate::tradecalendar::Tradingday;
 
 /// load Tradingday from db

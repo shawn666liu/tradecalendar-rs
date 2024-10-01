@@ -7,7 +7,7 @@ mod tests {
     // use std::env;
 
     use crate::calendar_helper::*;
-    use crate::time_helper::MyDateType;
+    use crate::jcswitch::MyDateType;
 
     #[test]
     fn gen_csv() -> Result<()> {
@@ -66,17 +66,17 @@ mod tests {
     #[cfg(feature = "with-jiff")]
     #[test]
     fn get_date_jiff() {
-        use crate::time_helper::date_from_i32;
+        use crate::jcswitch::date_from_i32;
 
         let res = date_from_i32(19645);
-        println!("by jiff: {}", res)
+        println!("by jiff: {}", res);
     }
     #[cfg(feature = "with-chrono")]
     #[test]
     fn get_date_chrono() {
-        use crate::time_helper::date_from_i32;
+        use crate::jcswitch::date_from_i32;
 
         let res = date_from_i32(19645);
-        println!("by chrono: {}", res)
+        println!("by chrono: {}", res);
     }
 }

@@ -1,3 +1,4 @@
+// jiff/chrono switch
 #[allow(dead_code)]
 #[cfg(feature = "with-chrono")]
 mod tm_chrono;

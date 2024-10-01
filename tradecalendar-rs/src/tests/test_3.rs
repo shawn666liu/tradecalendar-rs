@@ -5,7 +5,7 @@ mod tests {
     use std::str::FromStr;
 
     use crate::get_buildin_calendar;
-    use crate::time_helper::*;
+    use crate::jcswitch::*;
     use crate::tradecalendar::*;
 
     #[test]

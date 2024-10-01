@@ -1,13 +1,13 @@
 pub mod calendar_helper;
 mod db_helper;
-pub mod time_helper;
+pub mod jcswitch;
 mod tradecalendar;
 
 use std::path::Path;
 
 use anyhow::Result;
 use db_helper::load_tradingdays;
-use time_helper::MyDateType;
+use jcswitch::MyDateType;
 
 pub use crate::tradecalendar::*;
 

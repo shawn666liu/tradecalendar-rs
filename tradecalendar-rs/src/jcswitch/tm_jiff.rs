@@ -35,12 +35,13 @@ pub fn get_now() -> MyDateTimeType {
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn date_from_i32(days: i32) -> MyDateType {
-    // Date::from_unix_epoch_days(days)
+pub fn date_from_i32(days_since_epoch: i32) -> MyDateType {
+    // function is pub(crate)
+    // Date::from_unix_epoch_days(days_since_epoch)
 
     let DAYS_FROM_0000_01_01_TO_1970_01_01: i64 = 719_468;
     let DAYS_IN_ERA: i64 = 146_097;
-    let days: i64 = days.into();
+    let days: i64 = days_since_epoch.into();
 
     let days = days + DAYS_FROM_0000_01_01_TO_1970_01_01;
     let era = days / DAYS_IN_ERA;

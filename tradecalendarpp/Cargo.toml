@@ -1,0 +1,19 @@
+[package]
+name = "tradecalendarpp"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shawn Liu <shawn666.liu@hotmail.com>"]
+description = "交易日历cpp封装"
+
+[lib]
+name = "tradecalendarpp"
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "*"
+tradecalendar = { version = "*", path = "../tradecalendar-rs" }
+cxx = "*"
+chrono = "^0.4"
+
+[build-dependencies]
+cxx-build = "*"

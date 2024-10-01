@@ -5,7 +5,7 @@ use clap::{arg, value_parser, Command};
 use encoding_rs_io::DecodeReaderBytes;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::{absolute, PathBuf};
+use std::path::PathBuf;
 
 #[cfg(feature = "with-chrono")]
 use chrono::NaiveDate;

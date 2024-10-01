@@ -2,6 +2,8 @@
 name = "tradecalendarpy"
 version = "0.1.0"
 edition = "2021"
+authors = ["Shawn Liu <shawn666.liu@hotmail.com>"]
+description = "交易日历python封装"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
