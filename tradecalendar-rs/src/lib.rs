@@ -69,7 +69,7 @@ pub fn get_calendar<P: AsRef<Path>>(
     if let Ok(vec) = result {
         if !vec.is_empty() {
             let mut calendar = TradeCalendar::new();
-            calendar.reload(vec).unwrap();
+            calendar.reload(vec)?;
             return Ok(calendar);
         }
     }

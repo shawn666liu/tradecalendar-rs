@@ -62,21 +62,4 @@ mod tests {
         println!("Finished. save to {}", path.display());
         Ok(())
     }
-
-    #[cfg(feature = "with-jiff")]
-    #[test]
-    fn get_date_jiff() {
-        use crate::jcswitch::date_from_i32;
-
-        let res = date_from_i32(19645);
-        println!("by jiff: {}", res);
-    }
-    #[cfg(feature = "with-chrono")]
-    #[test]
-    fn get_date_chrono() {
-        use crate::jcswitch::date_from_i32;
-
-        let res = date_from_i32(19645);
-        println!("by chrono: {}", res);
-    }
 }

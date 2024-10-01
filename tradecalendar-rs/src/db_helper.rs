@@ -7,7 +7,7 @@ use connectorx::{get_arrow::get_arrow, source_router::SourceConn, sql::CXQuery};
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::jcswitch::date_from_i32;
+use crate::jcswitch::date_from_days_since_epoch;
 use crate::tradecalendar::Tradingday;
 
 /// load Tradingday from db
@@ -53,11 +53,11 @@ pub fn load_tradingdays(conn: &str, query: &str, proto: Option<String>) -> Resul
                 let days = tdays.value(idx);
                 let nxdays = next.value(idx);
                 let rec = Tradingday {
-                    date: date_from_i32(days),
+                    date: date_from_days_since_epoch(days),
                     morning: morning.value(idx),
                     trading: trading.value(idx),
                     night: night.value(idx),
-                    next: date_from_i32(nxdays),
+                    next: date_from_days_since_epoch(nxdays),
                 };
                 res.push(rec);
             }
@@ -71,11 +71,11 @@ pub fn load_tradingdays(conn: &str, query: &str, proto: Option<String>) -> Resul
                 let days = tdays.value(idx);
                 let nxdays = next.value(idx);
                 let rec = Tradingday {
-                    date: date_from_i32(days),
+                    date: date_from_days_since_epoch(days),
                     morning: morning.value(idx) > 0,
                     trading: trading.value(idx) > 0,
                     night: night.value(idx) > 0,
-                    next: date_from_i32(nxdays),
+                    next: date_from_days_since_epoch(nxdays),
                 };
                 res.push(rec);
             }

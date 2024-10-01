@@ -8,48 +8,12 @@ use pyo3_stub_gen::{
     derive::gen_stub_pymethods,
 };
 
-use tradecalendar::{self, get_buildin_calendar, get_calendar, get_csv_calendar, TradingdayCache};
+use tradecalendar::{
+    self, get_buildin_calendar, get_calendar, get_csv_calendar, NotTradingSearchMethod,
+    TradingdayCache,
+};
 
 use tradecalendar::TradeCalendar as RsCalendar;
-
-struct PyAnyhowErr(anyhow::Error);
-
-impl From<PyAnyhowErr> for PyErr {
-    fn from(value: PyAnyhowErr) -> Self {
-        PyErr::new::<pyo3::exceptions::PyException, _>(value.0.to_string())
-    }
-}
-
-// impl Into<PyErr> for AnyhowError {
-//     fn into(self) -> PyErr {
-//         PyErr::new::<pyo3::exceptions::PyException, _>(self.0.to_string())
-//     }
-// }
-
-impl From<anyhow::Error> for PyAnyhowErr {
-    fn from(value: anyhow::Error) -> Self {
-        Self(value)
-    }
-}
-
-// impl Into<AnyhowError> for anyhow::Error {
-//     fn into(self) -> AnyhowError {
-//         AnyhowError(self)
-//     }
-// }
-
-// fn pydate_to_date(py: Python, dt: Py<PyDate>) -> PyResult<NaiveDate> {
-//     let d = dt.bind(py);
-//     Ok(make_date(
-//         d.get_year(),
-//         d.get_month() as u32,
-//         d.get_day() as u32,
-//     ))
-// }
-
-// fn to_pydate<'a>(py: Python<'a>, d: &NaiveDate) -> Bound<'a, PyDate> {
-//     PyDate::new_bound(py, d.year(), d.month() as u8, d.day() as u8).unwrap()
-// }
 
 fn to_pyerr(e: anyhow::Error) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyException, _>(e.to_string())
@@ -65,28 +29,19 @@ struct TradeCalendar {
 // #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (start_date=None))]
-fn load_buildin_calendar(start_date: Option<NaiveDate>) -> Result<TradeCalendar, PyAnyhowErr> {
-    let calendar = get_buildin_calendar(start_date);
-    match calendar {
-        Ok(cal) => return Ok(TradeCalendar { entity: cal }),
-        Err(e) => {
-            return Err(e.into());
-        }
-    }
+fn load_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
+    get_buildin_calendar(start_date)
+        .and_then(|r| Ok(TradeCalendar { entity: r }))
+        .map_err(to_pyerr)
 }
 
 // #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (csv_file, start_date=None))]
-fn load_csv_calendar(
-    csv_file: &str,
-    start_date: Option<NaiveDate>,
-) -> Result<TradeCalendar, PyAnyhowErr> {
-    let calendar = get_csv_calendar(csv_file, start_date);
-    match calendar {
-        Ok(cal) => return Ok(TradeCalendar { entity: cal }),
-        Err(e) => return Err(e.into()),
-    }
+fn load_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
+    get_csv_calendar(csv_file, start_date)
+        .and_then(|r| Ok(TradeCalendar { entity: r }))
+        .map_err(to_pyerr)
 }
 
 // #[gen_stub_pyfunction]
@@ -98,14 +53,10 @@ fn load_calendar(
     proto: Option<String>,
     csv_file: Option<String>,
     start_date: Option<NaiveDate>,
-) -> Result<TradeCalendar, PyAnyhowErr> {
-    let calendar = get_calendar(db_conn, query, proto, csv_file, start_date);
-    match calendar {
-        Ok(cal) => return Ok(TradeCalendar { entity: cal }),
-        Err(e) => {
-            return Err(e.into());
-        }
-    }
+) -> PyResult<TradeCalendar> {
+    get_calendar(db_conn, query, proto, csv_file, start_date)
+        .and_then(|r| Ok(TradeCalendar { entity: r }))
+        .map_err(to_pyerr)
 }
 
 // #[gen_stub_pymethods]
@@ -114,19 +65,17 @@ impl TradeCalendar {
     fn is_trading_day(&self, date: NaiveDate) -> PyResult<bool> {
         self.entity.is_trading_day(&date).map_err(to_pyerr)
     }
-    fn get_next_trading_day(&self, date: NaiveDate, num: usize) -> Result<NaiveDate, PyAnyhowErr> {
-        let tday = self.entity.get_next_trading_day(&date, num);
-        match tday {
-            Ok(t) => Ok(t.date),
-            Err(e) => Err(e.into()),
-        }
+    fn get_next_trading_day(&self, date: NaiveDate, num: usize) -> PyResult<NaiveDate> {
+        self.entity
+            .get_next_trading_day(&date, num)
+            .and_then(|t| Ok(t.date))
+            .map_err(to_pyerr)
     }
     fn get_prev_trading_day(&self, date: NaiveDate, num: usize) -> PyResult<NaiveDate> {
-        let tday = self.entity.get_prev_trading_day(&date, num);
-        match tday {
-            Ok(t) => Ok(t.date),
-            Err(e) => Err(to_pyerr(e)),
-        }
+        self.entity
+            .get_prev_trading_day(&date, num)
+            .and_then(|t| Ok(t.date))
+            .map_err(to_pyerr)
     }
     /// 计算从start_date(含)到end_date(含)之间交易日的个数, 超出范围的部分将被忽略
     fn get_trading_days_count(&self, start_dt: NaiveDate, end_dt: NaiveDate) -> usize {
@@ -155,15 +104,35 @@ impl TradeCalendar {
         }
     }
 
+    /// 根据输入时间获取交易日,
+    ///
+    /// 如果输入的时间点是非交易时段, 则利用method确定是取前一个交易日, 还是后一交易日,
+    ///
+    /// 交易时段内的时间点不受影响
+    ///
+    /// is_finance_item, 金融期货的下午收盘时间点为15:15, 其他商品15:00
+    fn trading_day_from_datetime(
+        &self,
+        input: NaiveDateTime,
+        for_next: bool,
+        is_finance_item: bool,
+    ) -> PyResult<NaiveDate> {
+        let method = if for_next {
+            NotTradingSearchMethod::Next
+        } else {
+            NotTradingSearchMethod::Prev
+        };
+        self.entity
+            .trading_day_from_datetime(&input, method, is_finance_item)
+            .map_err(to_pyerr)
+    }
+
     //////////////////////////////////////////////////////////////////////////////////
     // 以下为有状态时的接口
     //////////////////////////////////////////////////////////////////////////////////
 
     fn reset(&mut self, start_time: Option<NaiveDateTime>) -> PyResult<()> {
-        match self.entity.reset(start_time.as_ref()) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(to_pyerr(e)),
-        }
+        self.entity.reset(start_time.as_ref()).map_err(to_pyerr)
     }
     fn is_trading(&self) -> bool {
         self.entity.is_trading()
@@ -180,10 +149,9 @@ impl TradeCalendar {
         datetime: NaiveDateTime,
         fail_safe: bool,
     ) -> PyResult<(NaiveDate, NaiveDate, NaiveDate, NaiveDate, Option<String>)> {
-        match self.entity.time_changed(&datetime, fail_safe) {
-            Ok(r) => Ok(r),
-            Err(e) => Err(to_pyerr(e)),
-        }
+        self.entity
+            .time_changed(&datetime, fail_safe)
+            .map_err(to_pyerr)
     }
 
     /// 重置日期边界的一些配置,
@@ -208,13 +176,9 @@ impl TradeCalendar {
         day_begin: NaiveTime,
         day_end: NaiveTime,
     ) -> PyResult<()> {
-        match self
-            .entity
+        self.entity
             .set_config(&tday_shift, &night_begin, &night_end, &day_begin, &day_end)
-        {
-            Ok(_) => Ok(()),
-            Err(e) => Err(to_pyerr(e)),
-        }
+            .map_err(to_pyerr)
     }
 }
 

@@ -198,6 +198,15 @@ pub trait TradingdayCache {
     /// 获取交易日列表(仅含交易日)，主要用于股票，不含夜盘
     fn get_trading_day_list(&self) -> &Vec<Tradingday>;
 
+    /// 获取原始的日期列表中最小的日期
+    fn min_date(&self) -> Option<&MyDateType> {
+        self.get_full_day_list().first().and_then(|t| Some(&t.date))
+    }
+    /// 获取原始的日期列表中最大的日期
+    fn max_date(&self) -> Option<&MyDateType> {
+        self.get_full_day_list().last().and_then(|t| Some(&t.date))
+    }
+
     /// 获取两个日期之间的交易日的slice, 包含这两个交易日, 超出范围的部分将被忽略
     fn get_trading_day_slice(&self, start_dt: &MyDateType, end_dt: &MyDateType) -> &[Tradingday] {
         if start_dt > end_dt {
@@ -250,7 +259,11 @@ pub trait TradingdayCache {
         if mid >= 0 {
             return Ok(list[mid as usize].trading);
         }
-        return Err(anyhow!("out of range"));
+        return Err(anyhow!(
+            "out of range. {:?} ~ {:?}",
+            self.min_date(),
+            self.max_date()
+        ));
     }
 
     /// 获取后续第num个交易日, 要求num大于零
@@ -270,7 +283,11 @@ pub trait TradingdayCache {
                 return Ok(&list[index]);
             }
         }
-        return Err(anyhow!("out of range"));
+        return Err(anyhow!(
+            "out of range. {:?} ~ {:?}",
+            self.min_date(),
+            self.max_date()
+        ));
     }
 
     /// 获取之前的第num个交易日，要求num大于零
@@ -285,7 +302,11 @@ pub trait TradingdayCache {
                 return Ok(&list[index as usize]);
             }
         }
-        return Err(anyhow!("out of range"));
+        return Err(anyhow!(
+            "out of range. {:?} ~ {:?}",
+            self.min_date(),
+            self.max_date()
+        ));
     }
 
     /// 计算从start_date(含)到end_date(含)之间交易日的个数, 超出范围的部分将被忽略
@@ -325,7 +346,7 @@ pub trait TradingdayCache {
     /// 交易时段内的时间点不受影响
     ///
     /// is_finance_item, 金融期货的下午收盘时间点为15:15, 其他商品15:00
-    fn trading_day_by_datetime(
+    fn trading_day_from_datetime(
         &self,
         input: &MyDateTimeType,
         method: NotTradingSearchMethod,
@@ -335,7 +356,11 @@ pub trait TradingdayCache {
         let date = input.date();
         let (_, index, _) = search_days(list, &date);
         if index < 0 {
-            return Err(anyhow!("out of range"));
+            return Err(anyhow!(
+                "out of range. {:?} ~ {:?}",
+                self.min_date(),
+                self.max_date()
+            ));
         };
 
         let index = index as usize;
@@ -726,13 +751,17 @@ impl TradeCalendar {
                     // 这个可能会发生在年末岁初,calendar没有及时更新的情况下
                     if fail_safe {
                         error_msg = Some(format!(
-                            "out of range when get next for {}. 请更新交易日历",
+                            "out of range ({:?} ~ {:?}), when get next for {}. 请更新交易日历",
+                            self.min_date(),
+                            self.max_date(),
                             &current_tday
                         ));
                         self.next_tday = next_working_day(&current_tday, 1);
                     } else {
                         return Err(anyhow!(
-                            "TradeCalendar::time_change(), out of range for full_days_list"
+                            "TradeCalendar::time_change(), out of range ({:?} ~ {:?}) for full_days_list",
+                            self.min_date(),
+                            self.max_date(),
                         ));
                     }
                 }
