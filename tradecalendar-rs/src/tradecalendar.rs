@@ -835,7 +835,7 @@ impl TradeCalendar {
         // 这里能确定的假日就是元旦，五一国庆当然也能确定，但五一国庆的时候肯定已经更新交易日历了吧，
         // 所以这里只检查元旦就OK了
         if calendar.morning {
-            let first_day = make_date(input.year(), 1, 1);
+            let first_day = make_date(input.year() as i32, 1, 1);
 
             #[cfg(feature = "with-chrono")]
             let mut theday = *input - Duration::days(1);

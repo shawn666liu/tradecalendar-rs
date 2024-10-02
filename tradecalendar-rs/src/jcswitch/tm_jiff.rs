@@ -1,5 +1,4 @@
 use jiff::civil::{Date, DateTime, Time};
-use jiff::Unit;
 
 pub type MyDateType = Date;
 
@@ -9,12 +8,12 @@ pub type MyTimeType = Time;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn make_date(year: i16, month: i8, day: i8) -> MyDateType {
-    return Date::constant(year, month, day);
+pub fn make_date(year: i32, month: u32, day: u32) -> MyDateType {
+    return Date::constant(year as i16, month as i8, day as i8);
 }
 
-pub fn make_time(hour: i8, minute: i8, second: i8) -> MyTimeType {
-    return Time::constant(hour, minute, second, 0);
+pub fn make_time(hour: u32, minute: u32, second: u32) -> MyTimeType {
+    return Time::constant(hour as i8, minute as i8, second as i8, 0);
 }
 
 pub fn tomorrow(date: &MyDateType) -> MyDateType {
@@ -25,8 +24,8 @@ pub fn yesterday(date: &MyDateType) -> MyDateType {
     return date.yesterday().expect("yesterday() failed");
 }
 
-pub fn date_at_hms(date: &MyDateType, hour: i8, minute: i8, second: i8) -> MyDateTimeType {
-    return date.at(hour, minute, second, 0);
+pub fn date_at_hms(date: &MyDateType, hour: u32, minute: u32, second: u32) -> MyDateTimeType {
+    return date.at(hour as i8, minute as i8, second as i8, 0);
 }
 
 pub fn get_now() -> MyDateTimeType {

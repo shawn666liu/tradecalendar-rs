@@ -12,8 +12,8 @@ use crate::tradecalendar::*;
 
 /// 将当年假期列表，转换为交易日列表(排除了周末及这些假期, 仅交易日)
 pub fn holidays_to_tradingdays(holiday_list: &Vec<MyDateType>) -> Vec<MyDateType> {
-    let mut the_day = make_date(holiday_list[0].year(), 1, 1);
-    let next_year_first = make_date(holiday_list[0].year() + 1, 1, 1);
+    let mut the_day = make_date(holiday_list[0].year() as i32, 1, 1);
+    let next_year_first = make_date(holiday_list[0].year() as i32 + 1, 1, 1);
     let mut result: Vec<MyDateType> = Vec::with_capacity(260);
     while the_day < next_year_first {
         let dw = the_day.weekday();
@@ -53,7 +53,7 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<MyDateType>) -> Vec<Tradingday
     // 此时假期安排已经公布，需要进行修正
     // pre_day是上一年度的最后一个交易日，很可能是12月31日，如果不是的话，则倒退寻找
 
-    let mut pre_day = yesterday(&make_date(trading_days[0].year(), 1, 1));
+    let mut pre_day = yesterday(&make_date(trading_days[0].year() as i32, 1, 1));
 
     let mut dw = pre_day.weekday();
     #[cfg(feature = "with-chrono")]
@@ -88,7 +88,7 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<MyDateType>) -> Vec<Tradingday
     };
     result.push(pre_year_last_tday);
 
-    let next_yuandan = make_date(trading_days[trading_days.len() - 1].year() + 1, 1, 1);
+    let next_yuandan = make_date(trading_days[trading_days.len() - 1].year() as i32 + 1, 1, 1);
 
     println!(
         "正在准备数据, [{}, {}),请稍候... ",
