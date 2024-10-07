@@ -123,7 +123,7 @@ impl TradeCalendar {
     /// day_begin: 缺省值 8:30:00
     ///
     /// day_end: 缺省值 15:30:00
-    fn set_config(
+    pub fn set_config(
         &mut self,
         tday_shift_nanos: i64,
         night_begin_nanos: i64,
@@ -138,6 +138,21 @@ impl TradeCalendar {
         let day_end = time_from_midnight_nanos(day_end_nanos);
         self.entity
             .set_config(&tday_shift, &night_begin, &night_end, &day_begin, &day_end)
+    }
+
+    /// 前一交易日
+    pub fn prev_tday(&self) -> i32 {
+        date_to_days_since_epoch(self.entity.prev_tday())
+    }
+
+    /// 获取当前交易日
+    pub fn current_tday(&self) -> i32 {
+        date_to_days_since_epoch(self.entity.current_tday())
+    }
+
+    /// 后一交易日
+    pub fn next_tday(&self) -> i32 {
+        date_to_days_since_epoch(self.entity.next_tday())
     }
 }
 
@@ -211,6 +226,10 @@ mod ffi {
             datetime_nano: i64,
             fail_safe: bool,
         ) -> Result<TimeChangedResult>;
+
+        fn prev_tday(self: &TradeCalendar) -> i32;
+        fn current_tday(self: &TradeCalendar) -> i32;
+        fn next_tday(self: &TradeCalendar) -> i32;
 
     }
 }

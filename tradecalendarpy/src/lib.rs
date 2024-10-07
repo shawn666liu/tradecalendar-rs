@@ -180,6 +180,21 @@ impl TradeCalendar {
             .set_config(&tday_shift, &night_begin, &night_end, &day_begin, &day_end)
             .map_err(to_pyerr)
     }
+
+    /// 前一交易日
+    pub fn prev_tday(&self) -> NaiveDate {
+        *self.entity.prev_tday()
+    }
+
+    /// 获取当前交易日
+    pub fn current_tday(&self) -> NaiveDate {
+        *self.entity.current_tday()
+    }
+
+    /// 后一交易日
+    pub fn next_tday(&self) -> NaiveDate {
+        *self.entity.next_tday()
+    }
 }
 
 /// A Python module implemented in Rust.
