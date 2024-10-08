@@ -102,8 +102,12 @@ impl TradeCalendarPP {
     //////////////////////////////////////////////////////////////////////////////////
 
     pub fn reset(&mut self, start_time_nanos: i64) -> Result<()> {
-        let datetime = datetime_from_timestamp_nanos(start_time_nanos);
-        self.entity.reset(Some(&datetime))
+        let start = if start_time_nanos == 0 {
+            Some(datetime_from_timestamp_nanos(start_time_nanos))
+        } else {
+            None
+        };
+        self.entity.reset(start.as_ref())
     }
 
     pub fn is_trading(&self) -> bool {

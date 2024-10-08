@@ -661,11 +661,21 @@ impl TradeCalendar {
     /// 仅用于回溯模式
     ///
     /// 重置内部状态，以便重新开始
+    /// 如果提供了start_time,则start_time必须在内部所加载的数据日期范围里面,否则报错
+    /// 如果不提供start_time,则使用full_day_list的第一条数据重置状态
     pub fn reset(&mut self, start_time: Option<&MyDateTimeType>) -> Result<()> {
-        let td = &self.full_day_list[0];
+        let td = &self
+            .full_day_list
+            .first()
+            .ok_or(anyhow!("full_day_list is empty"))?;
         let current_time = date_at_hms(&td.date, 0, 0, 0);
-        self.curr_tday = MyDateType::MIN;
-        self.time_changed(start_time.unwrap_or(&current_time), true)?;
+        self.curr_tday = make_date(1970, 1, 1);
+        let change = self.time_changed(start_time.unwrap_or(&current_time), true)?;
+        // println!("reset(), {:#?}", change);
+        if let Some(error) = change.4 {
+            return Err(anyhow!(error));
+        }
+
         Ok(())
     }
 

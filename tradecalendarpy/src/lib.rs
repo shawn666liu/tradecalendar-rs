@@ -134,6 +134,7 @@ impl TradeCalendar {
     fn reset(&mut self, start_time: Option<NaiveDateTime>) -> PyResult<()> {
         self.entity.reset(start_time.as_ref()).map_err(to_pyerr)
     }
+
     fn is_trading(&self) -> bool {
         self.entity.is_trading()
     }

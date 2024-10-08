@@ -18,6 +18,13 @@ mod tests {
         let now = get_now();
         let change = mgr.time_changed(&now, false)?;
         println!("change info: {:#?}", change);
+        // 由于1970小于加载数据的开始时间, reset应该报错
+        let start_time = date_at_hms(&make_date(1970, 1, 1), 0, 0, 0);
+        let result = mgr.reset(Some(&start_time));
+        assert!(result.is_err());
+        // 使用None参数,Ok
+        let result = mgr.reset(None);
+        assert!(result.is_ok());
         Ok(())
     }
 
