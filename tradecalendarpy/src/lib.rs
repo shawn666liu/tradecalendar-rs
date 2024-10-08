@@ -8,12 +8,7 @@ use pyo3_stub_gen::{
     derive::gen_stub_pymethods,
 };
 
-use tradecalendar::{
-    self, get_buildin_calendar, get_calendar, get_csv_calendar, NotTradingSearchMethod,
-    TradingdayCache,
-};
-
-use tradecalendar::TradeCalendar as RsCalendar;
+use tradecalendar::{self, reload_calendar, NotTradingSearchMethod, TradingdayCache};
 
 fn to_pyerr(e: anyhow::Error) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyException, _>(e.to_string())
@@ -23,14 +18,14 @@ fn to_pyerr(e: anyhow::Error) -> PyErr {
 #[pyclass]
 #[allow(dead_code)]
 struct TradeCalendar {
-    entity: RsCalendar,
+    entity: tradecalendar::TradeCalendar,
 }
 
 // #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (start_date=None))]
-fn load_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
-    get_buildin_calendar(start_date)
+fn get_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
+    tradecalendar::get_buildin_calendar(start_date)
         .and_then(|r| Ok(TradeCalendar { entity: r }))
         .map_err(to_pyerr)
 }
@@ -38,8 +33,8 @@ fn load_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalenda
 // #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (csv_file, start_date=None))]
-fn load_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
-    get_csv_calendar(csv_file, start_date)
+fn get_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
+    tradecalendar::get_csv_calendar(csv_file, start_date)
         .and_then(|r| Ok(TradeCalendar { entity: r }))
         .map_err(to_pyerr)
 }
@@ -47,14 +42,14 @@ fn load_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<
 // #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (db_conn, query, proto=None, csv_file=None, start_date=None))]
-fn load_calendar(
+fn get_calendar(
     db_conn: &str,
     query: &str,
     proto: Option<String>,
     csv_file: Option<String>,
     start_date: Option<NaiveDate>,
 ) -> PyResult<TradeCalendar> {
-    get_calendar(db_conn, query, proto, csv_file, start_date)
+    tradecalendar::get_calendar(db_conn, query, proto, csv_file, start_date)
         .and_then(|r| Ok(TradeCalendar { entity: r }))
         .map_err(to_pyerr)
 }
@@ -62,6 +57,25 @@ fn load_calendar(
 // #[gen_stub_pymethods]
 #[pymethods]
 impl TradeCalendar {
+    fn reload(
+        &mut self,
+        db_conn: &str,
+        query: &str,
+        proto: Option<String>,
+        csv_file: Option<String>,
+        start_date: Option<NaiveDate>,
+    ) -> PyResult<()> {
+        reload_calendar(
+            &mut self.entity,
+            db_conn,
+            query,
+            proto,
+            csv_file,
+            start_date,
+        )
+        .map_err(to_pyerr)
+    }
+
     fn is_trading_day(&self, date: NaiveDate) -> PyResult<bool> {
         self.entity.is_trading_day(&date).map_err(to_pyerr)
     }
@@ -212,9 +226,9 @@ impl TradeCalendar {
 /// A Python module implemented in Rust.
 #[pymodule]
 fn tradecalendarpy(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(load_buildin_calendar, m)?)?;
-    m.add_function(wrap_pyfunction!(load_csv_calendar, m)?)?;
-    m.add_function(wrap_pyfunction!(load_calendar, m)?)?;
+    m.add_function(wrap_pyfunction!(get_buildin_calendar, m)?)?;
+    m.add_function(wrap_pyfunction!(get_csv_calendar, m)?)?;
+    m.add_function(wrap_pyfunction!(get_calendar, m)?)?;
     m.add_class::<TradeCalendar>()?;
     Ok(())
 }

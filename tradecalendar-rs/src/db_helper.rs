@@ -17,7 +17,14 @@ use crate::tradecalendar::Tradingday;
 ///
 /// query: 5 fields required, keep the order of feilds,
 /// select date,morning,trading,night,next from your_table where xxx order by date;
-pub fn load_tradingdays(conn: &str, query: &str, proto: Option<String>) -> Result<Vec<Tradingday>> {
+pub fn load_tradingdays_from_db(
+    conn: &str,
+    query: &str,
+    proto: Option<String>,
+) -> Result<Vec<Tradingday>> {
+    if conn.is_empty() || query.is_empty() {
+        return Err(anyhow!("connection string or query is empty"));
+    }
     let mut source_conn = SourceConn::try_from(conn)?;
     if let Some(mode) = proto {
         source_conn.proto = mode;

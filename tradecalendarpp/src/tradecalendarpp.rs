@@ -4,27 +4,25 @@ use tradecalendar::jcswitch::{
     date_from_days_since_epoch, date_to_days_since_epoch, datetime_from_timestamp_nanos,
     time_from_midnight_nanos, time_to_midnight_nanos,
 };
-use tradecalendar::{
-    self, get_buildin_calendar, get_calendar, get_csv_calendar, NotTradingSearchMethod,
-    TradingdayCache,
-};
+use tradecalendar::{self, NotTradingSearchMethod, TradingdayCache};
 
 pub struct TradeCalendarPP {
     entity: tradecalendar::TradeCalendar,
 }
 
-fn load_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendarPP>> {
+fn get_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendarPP>> {
     let start_date = date_from_days_since_epoch(start_date);
-    get_buildin_calendar(Some(start_date)).and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
-}
-
-fn load_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendarPP>> {
-    let start_date = date_from_days_since_epoch(start_date);
-    get_csv_calendar(csv_file, Some(start_date))
+    tradecalendar::get_buildin_calendar(Some(start_date))
         .and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
 }
 
-fn load_calendar(
+fn get_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendarPP>> {
+    let start_date = date_from_days_since_epoch(start_date);
+    tradecalendar::get_csv_calendar(csv_file, Some(start_date))
+        .and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
+}
+
+fn get_calendar(
     db_conn: String,
     query: String,
     proto: String,
@@ -38,11 +36,36 @@ fn load_calendar(
     } else {
         Some(csv_file)
     };
-    get_calendar(&db_conn, &query, proto, csv_file, Some(start_date))
+    tradecalendar::get_calendar(&db_conn, &query, proto, csv_file, Some(start_date))
         .and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
 }
 
 impl TradeCalendarPP {
+    pub fn reload(
+        &mut self,
+        db_conn: String,
+        query: String,
+        proto: String,
+        csv_file: String,
+        start_date: i32,
+    ) -> Result<()> {
+        let proto = if proto.is_empty() { None } else { Some(proto) };
+        let csv_file = if csv_file.is_empty() {
+            None
+        } else {
+            Some(csv_file)
+        };
+        let start_date = date_from_days_since_epoch(start_date);
+        tradecalendar::reload_calendar(
+            &mut self.entity,
+            &db_conn,
+            &query,
+            proto,
+            csv_file,
+            Some(start_date),
+        )
+    }
+
     //////////////////////////////////////////////////////////////////////////////////
     // 以下为无状态接口
     //////////////////////////////////////////////////////////////////////////////////
@@ -196,15 +219,27 @@ mod ffi {
 
     extern "Rust" {
         type TradeCalendarPP;
-        fn load_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendarPP>>;
-        fn load_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendarPP>>;
-        fn load_calendar(
+        fn get_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendarPP>>;
+        fn get_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendarPP>>;
+        fn get_calendar(
             db_conn: String,
             query: String,
             proto: String,
             csv_file: String,
             start_date: i32,
         ) -> Result<Box<TradeCalendarPP>>;
+
+        //////////////////////////////////////////////////////////////////////////////////
+
+        fn reload(
+            self: &mut TradeCalendarPP,
+            db_conn: String,
+            query: String,
+            proto: String,
+            csv_file: String,
+            start_date: i32,
+        ) -> Result<()>;
+
         //////////////////////////////////////////////////////////////////////////////////
 
         fn is_trading_day(self: &TradeCalendarPP, days_since_epoch: i32) -> Result<bool>;

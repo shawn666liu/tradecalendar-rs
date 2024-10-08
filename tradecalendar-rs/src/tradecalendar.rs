@@ -671,7 +671,11 @@ impl TradeCalendar {
         let current_time = date_at_hms(&td.date, 0, 0, 0);
         self.curr_tday = make_date(1970, 1, 1);
         let change = self.time_changed(start_time.unwrap_or(&current_time), true)?;
-        // println!("reset(), {:#?}", change);
+        #[cfg(debug_assertions)]
+        {
+            println!("tradecalendar::reset()\n{:#?}", change);
+        }
+
         if let Some(error) = change.4 {
             return Err(anyhow!(error));
         }

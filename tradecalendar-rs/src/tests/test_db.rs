@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::db_helper::load_tradingdays;
+    use crate::db_helper::load_tradingdays_from_db;
     use anyhow::Result;
 
     #[test]
@@ -16,7 +16,7 @@ mod tests {
         // clickhouse使用mysql协议读取
         // let conn = "mysql://readonly:readonly@192.168.9.122:9004/futuredb";
         let conn = "mysql://readonly:readonly@192.168.100.208:9004/futuredb";
-        let res = load_tradingdays(conn, query, Some("text".into()))?;
+        let res = load_tradingdays_from_db(conn, query, Some("text".into()))?;
 
         for td in res.iter() {
             println!("{:?}", td);
