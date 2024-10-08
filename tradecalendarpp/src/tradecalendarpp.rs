@@ -2,26 +2,26 @@ use anyhow::{anyhow, Result};
 
 use tradecalendar::jcswitch::{
     date_from_days_since_epoch, date_to_days_since_epoch, datetime_from_timestamp_nanos,
-    time_from_midnight_nanos,
+    time_from_midnight_nanos, time_to_midnight_nanos,
 };
 use tradecalendar::{
     self, get_buildin_calendar, get_calendar, get_csv_calendar, NotTradingSearchMethod,
     TradingdayCache,
 };
 
-pub struct TradeCalendar {
+pub struct TradeCalendarPP {
     entity: tradecalendar::TradeCalendar,
 }
 
-fn load_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendar>> {
+fn load_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendarPP>> {
     let start_date = date_from_days_since_epoch(start_date);
-    get_buildin_calendar(Some(start_date)).and_then(|r| Ok(Box::new(TradeCalendar { entity: r })))
+    get_buildin_calendar(Some(start_date)).and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
 }
 
-fn load_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendar>> {
+fn load_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendarPP>> {
     let start_date = date_from_days_since_epoch(start_date);
     get_csv_calendar(csv_file, Some(start_date))
-        .and_then(|r| Ok(Box::new(TradeCalendar { entity: r })))
+        .and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
 }
 
 fn load_calendar(
@@ -30,7 +30,7 @@ fn load_calendar(
     proto: String,
     csv_file: String,
     start_date: i32,
-) -> Result<Box<TradeCalendar>> {
+) -> Result<Box<TradeCalendarPP>> {
     let start_date = date_from_days_since_epoch(start_date);
     let proto = if proto.is_empty() { None } else { Some(proto) };
     let csv_file = if csv_file.is_empty() {
@@ -39,10 +39,10 @@ fn load_calendar(
         Some(csv_file)
     };
     get_calendar(&db_conn, &query, proto, csv_file, Some(start_date))
-        .and_then(|r| Ok(Box::new(TradeCalendar { entity: r })))
+        .and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
 }
 
-impl TradeCalendar {
+impl TradeCalendarPP {
     //////////////////////////////////////////////////////////////////////////////////
     // 以下为无状态接口
     //////////////////////////////////////////////////////////////////////////////////
@@ -158,7 +158,7 @@ impl TradeCalendar {
 
 #[cxx::bridge(namespace = "tradecalendarpp")]
 mod ffi {
-    struct TradingDay {
+    struct TradingDayPP {
         date: i32,
         morning: bool,
         trading: bool,
@@ -166,7 +166,7 @@ mod ffi {
         next: i32,
     }
 
-    struct TimeChangedResult {
+    struct TimeChangedResultPP {
         prev_tradeday: i32,
         curr_tradeday: i32,
         prev_date: i32,
@@ -174,35 +174,51 @@ mod ffi {
         error_msg: String,
     }
 
+    struct TradingCheckConfigPP {
+        /// 夜盘属于下一个交易日，这个变量指示什么时间点进行切换，一般是夜里19:00~20点，缺省19:30
+        pub tday_shift: i64,
+
+        //-------------------- begin 以下几个字段用来判断接口是否应该处于连接状态
+        /// 缺省夜里 20:30
+        pub night_begin: i64,
+        /// 缺省凌晨 2:31
+        pub night_end: i64,
+        /// 缺省早上 8:30
+        pub day_begin: i64,
+        /// 缺省下午 15:30
+        pub day_end: i64,
+        //-------------------- end
+    }
+
     extern "Rust" {
-        type TradeCalendar;
-        fn load_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendar>>;
-        fn load_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendar>>;
+        type TradeCalendarPP;
+        fn load_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendarPP>>;
+        fn load_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendarPP>>;
         fn load_calendar(
             db_conn: String,
             query: String,
             proto: String,
             csv_file: String,
             start_date: i32,
-        ) -> Result<Box<TradeCalendar>>;
+        ) -> Result<Box<TradeCalendarPP>>;
         //////////////////////////////////////////////////////////////////////////////////
 
-        fn is_trading_day(self: &TradeCalendar, days_since_epoch: i32) -> Result<bool>;
+        fn is_trading_day(self: &TradeCalendarPP, days_since_epoch: i32) -> Result<bool>;
         fn get_next_trading_day(
-            self: &TradeCalendar,
+            self: &TradeCalendarPP,
             days_since_epoch: i32,
             num: usize,
         ) -> Result<i32>;
         fn get_prev_trading_day(
-            self: &TradeCalendar,
+            self: &TradeCalendarPP,
             days_since_epoch: i32,
             num: usize,
         ) -> Result<i32>;
-        fn get_trading_days_count(self: &TradeCalendar, start_dt: i32, end_dt: i32) -> usize;
-        fn get_trading_days_list(self: &TradeCalendar, start_dt: i32, end_dt: i32) -> Vec<i32>;
-        fn get_date_detail(self: &TradeCalendar, days_since_epoch: i32) -> Result<TradingDay>;
+        fn get_trading_days_count(self: &TradeCalendarPP, start_dt: i32, end_dt: i32) -> usize;
+        fn get_trading_days_list(self: &TradeCalendarPP, start_dt: i32, end_dt: i32) -> Vec<i32>;
+        fn get_date_detail(self: &TradeCalendarPP, days_since_epoch: i32) -> Result<TradingDayPP>;
         fn trading_day_from_datetime(
-            self: &TradeCalendar,
+            self: &TradeCalendarPP,
             datetime_nanos: i64,
             for_next: bool,
             is_finance_item: bool,
@@ -210,10 +226,10 @@ mod ffi {
 
         //////////////////////////////////////////////////////////////////////////////////////////////
 
-        fn reset(self: &mut TradeCalendar, start_time_nanos: i64) -> Result<()>;
-        fn is_trading(self: &TradeCalendar) -> bool;
+        fn reset(self: &mut TradeCalendarPP, start_time_nanos: i64) -> Result<()>;
+        fn is_trading(self: &TradeCalendarPP) -> bool;
         fn set_config(
-            self: &mut TradeCalendar,
+            self: &mut TradeCalendarPP,
             tday_shift: i64,
             night_begin: i64,
             night_end: i64,
@@ -221,26 +237,31 @@ mod ffi {
             day_end: i64,
         ) -> Result<()>;
 
+        fn get_config(self: &TradeCalendarPP) -> TradingCheckConfigPP;
+
         fn time_changed(
-            self: &mut TradeCalendar,
+            self: &mut TradeCalendarPP,
             datetime_nano: i64,
             fail_safe: bool,
-        ) -> Result<TimeChangedResult>;
+        ) -> Result<TimeChangedResultPP>;
 
-        fn prev_tday(self: &TradeCalendar) -> i32;
-        fn current_tday(self: &TradeCalendar) -> i32;
-        fn next_tday(self: &TradeCalendar) -> i32;
+        fn prev_tday(self: &TradeCalendarPP) -> i32;
+        fn current_tday(self: &TradeCalendarPP) -> i32;
+        fn next_tday(self: &TradeCalendarPP) -> i32;
 
     }
 }
 
-impl TradeCalendar {
+impl TradeCalendarPP {
     /// 获取某个日期的交易日详细信息, 无状态
     /// date, morning, trading, night, next
-    pub fn get_date_detail(self: &TradeCalendar, days_since_epoch: i32) -> Result<ffi::TradingDay> {
+    pub fn get_date_detail(
+        self: &TradeCalendarPP,
+        days_since_epoch: i32,
+    ) -> Result<ffi::TradingDayPP> {
         let date = date_from_days_since_epoch(days_since_epoch);
         match self.entity.get_date_detail(&date) {
-            Some(t) => Ok(ffi::TradingDay {
+            Some(t) => Ok(ffi::TradingDayPP {
                 date: date_to_days_since_epoch(&t.date),
                 morning: t.morning,
                 trading: t.trading,
@@ -262,15 +283,15 @@ impl TradeCalendar {
     /// 返回值: tuple(上个交易日, 当前交易日, 上个自然日, 当前自然日, Option<Error_Message>)
     ///
     pub fn time_changed(
-        self: &mut TradeCalendar,
+        self: &mut TradeCalendarPP,
         datetime_nano: i64,
         fail_safe: bool,
-    ) -> Result<ffi::TimeChangedResult> {
+    ) -> Result<ffi::TimeChangedResultPP> {
         let datetime = datetime_from_timestamp_nanos(datetime_nano);
         self.entity
             .time_changed(&datetime, fail_safe)
             .and_then(|r| {
-                Ok(ffi::TimeChangedResult {
+                Ok(ffi::TimeChangedResultPP {
                     prev_tradeday: date_to_days_since_epoch(&r.0),
                     curr_tradeday: date_to_days_since_epoch(&r.1),
                     prev_date: date_to_days_since_epoch(&r.2),
@@ -278,5 +299,16 @@ impl TradeCalendar {
                     error_msg: r.4.unwrap_or_default(),
                 })
             })
+    }
+
+    pub fn get_config(&self) -> ffi::TradingCheckConfigPP {
+        let cfg = self.entity.get_config();
+        ffi::TradingCheckConfigPP {
+            tday_shift: time_to_midnight_nanos(&cfg.tday_shift),
+            night_begin: time_to_midnight_nanos(&cfg.night_begin),
+            night_end: time_to_midnight_nanos(&cfg.night_end),
+            day_begin: time_to_midnight_nanos(&cfg.day_begin),
+            day_end: time_to_midnight_nanos(&cfg.day_end),
+        }
     }
 }

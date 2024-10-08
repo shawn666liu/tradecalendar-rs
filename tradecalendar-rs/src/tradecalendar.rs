@@ -488,29 +488,29 @@ pub trait TradingdayCache {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// 用来检测当前时间点是否交易, 及交易日切换的一些配置项
-struct TradingCheckConfig {
+pub struct TradingCheckConfig {
     /// 夜盘属于下一个交易日，这个变量指示什么时间点进行切换，一般是夜里19:00~20点，缺省19:30
     pub tday_shift: MyTimeType,
 
     //-------------------- begin 以下几个字段用来判断接口是否应该处于连接状态
     /// 缺省夜里 20:30
-    pub _night_begin: MyTimeType,
+    pub night_begin: MyTimeType,
     /// 缺省凌晨 2:31
-    pub _night_end: MyTimeType,
+    pub night_end: MyTimeType,
     /// 缺省早上 8:30
-    pub _day_begin: MyTimeType,
+    pub day_begin: MyTimeType,
     /// 缺省下午 15:30
-    pub _day_end: MyTimeType,
+    pub day_end: MyTimeType,
     //-------------------- end
 }
 impl Default for TradingCheckConfig {
     fn default() -> Self {
         Self {
             tday_shift: make_time(19, 30, 0),
-            _night_begin: make_time(20, 30, 0),
-            _night_end: make_time(2, 31, 0),
-            _day_begin: make_time(8, 30, 0),
-            _day_end: make_time(15, 30, 0),
+            night_begin: make_time(20, 30, 0),
+            night_end: make_time(2, 31, 0),
+            day_begin: make_time(8, 30, 0),
+            day_end: make_time(15, 30, 0),
         }
     }
 }
@@ -632,11 +632,15 @@ impl TradeCalendar {
         }
 
         self.cfg.tday_shift = tday_shift.clone();
-        self.cfg._night_begin = night_begin.clone();
-        self.cfg._night_end = night_end.clone();
-        self.cfg._day_begin = day_begin.clone();
-        self.cfg._day_end = day_end.clone();
+        self.cfg.night_begin = night_begin.clone();
+        self.cfg.night_end = night_end.clone();
+        self.cfg.day_begin = day_begin.clone();
+        self.cfg.day_end = day_end.clone();
         Ok(())
+    }
+
+    pub fn get_config(&self) -> &TradingCheckConfig {
+        &self.cfg
     }
 
     /// 重新加载交易日历列表，年末时交易日历需更新，使用此函数日常重新加载
@@ -780,13 +784,13 @@ impl TradeCalendar {
 
     /// 重算is_trading变量, 当前Tradingday已知
     fn check_is_trading(&self, time: &MyTimeType, tday: &Tradingday) -> bool {
-        if time >= &self.cfg._night_begin {
+        if time >= &self.cfg.night_begin {
             return tday.night;
         }
-        if time <= &self.cfg._night_end {
+        if time <= &self.cfg.night_end {
             return tday.morning;
         }
-        if time >= &self.cfg._day_begin && time <= &self.cfg._day_end {
+        if time >= &self.cfg.day_begin && time <= &self.cfg.day_end {
             return tday.trading;
         }
         return false;

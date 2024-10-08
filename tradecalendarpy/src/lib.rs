@@ -181,6 +181,17 @@ impl TradeCalendar {
             .map_err(to_pyerr)
     }
 
+    pub fn get_config(&self) -> (NaiveTime, NaiveTime, NaiveTime, NaiveTime, NaiveTime) {
+        let cfg = self.entity.get_config();
+        (
+            cfg.tday_shift,
+            cfg.night_begin,
+            cfg.night_end,
+            cfg.day_begin,
+            cfg.day_end,
+        )
+    }
+
     /// 前一交易日
     pub fn prev_tday(&self) -> NaiveDate {
         *self.entity.prev_tday()
