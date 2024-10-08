@@ -8,7 +8,9 @@ use pyo3_stub_gen::{
     derive::gen_stub_pymethods,
 };
 
-use tradecalendar::{self, reload_calendar, NotTradingSearchMethod, TradingdayCache};
+use tradecalendar::{
+    self, jcswitch::make_date, reload_calendar, NotTradingSearchMethod, TradingdayCache,
+};
 
 fn to_pyerr(e: anyhow::Error) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyException, _>(e.to_string())
@@ -139,6 +141,20 @@ impl TradeCalendar {
         self.entity
             .trading_day_from_datetime(&input, method, is_finance_item)
             .map_err(to_pyerr)
+    }
+
+    fn max_date(&self) -> NaiveDate {
+        self.entity
+            .max_date()
+            .and_then(|d| Some(*d))
+            .unwrap_or_else(|| make_date(1970, 1, 1))
+    }
+
+    fn min_date(&self) -> NaiveDate {
+        self.entity
+            .min_date()
+            .and_then(|d| Some(*d))
+            .unwrap_or_else(|| make_date(1970, 1, 1))
     }
 
     //////////////////////////////////////////////////////////////////////////////////

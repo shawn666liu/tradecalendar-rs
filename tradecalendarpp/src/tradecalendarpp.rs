@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 
 use tradecalendar::jcswitch::{
-    date_from_days_since_epoch, date_to_days_since_epoch, datetime_from_timestamp_nanos,
+    date_from_days_since_epoch, date_to_days_since_epoch, datetime_from_timestamp_nanos, make_date,
     time_from_midnight_nanos, time_to_midnight_nanos,
 };
 use tradecalendar::{self, NotTradingSearchMethod, TradingdayCache};
@@ -118,6 +118,24 @@ impl TradeCalendarPP {
         self.entity
             .trading_day_from_datetime(&datetime, method, is_finance_item)
             .and_then(|r| Ok(date_to_days_since_epoch(&r)))
+    }
+
+    fn max_date(&self) -> i32 {
+        let val = self
+            .entity
+            .max_date()
+            .and_then(|m| Some(*m))
+            .unwrap_or_else(|| make_date(1970, 1, 1));
+        date_to_days_since_epoch(&val)
+    }
+
+    fn min_date(&self) -> i32 {
+        let val = self
+            .entity
+            .min_date()
+            .and_then(|m| Some(*m))
+            .unwrap_or_else(|| make_date(1970, 1, 1));
+        date_to_days_since_epoch(&val)
     }
 
     //////////////////////////////////////////////////////////////////////////////////
@@ -262,6 +280,9 @@ mod ffi {
             for_next: bool,
             is_finance_item: bool,
         ) -> Result<i32>;
+
+        fn max_date(&self) -> i32;
+        fn min_date(&self) -> i32;
 
         //////////////////////////////////////////////////////////////////////////////////////////////
 
