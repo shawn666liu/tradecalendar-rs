@@ -56,7 +56,7 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
                 (None, Some(_)) => Some(r2),
                 (Some(_), None) => Some(r1),
                 (Some(t1), Some(t2)) => {
-                    if t1.date > t2.date {
+                    if t1.date >= t2.date {
                         Some(r1)
                     } else {
                         Some(r2)
