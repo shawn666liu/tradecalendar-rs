@@ -154,36 +154,6 @@ impl TradeCalendarPP {
     pub fn is_trading(&self) -> bool {
         self.entity.is_trading()
     }
-    /// 重置日期边界的一些配置,
-    /// 调用此函数之后，可以调用time_changed()刷新状态
-    ///
-    /// tday_shift: 交易日切换的时间点，缺省值 19:30:00, 影响trading_day()/prev_tday()/next_tday()
-    ///
-    /// 以下4个配置影响 is_trading()
-    ///
-    /// night_begin: 缺省值 20:30:00
-    ///
-    /// night_end: 缺省值 2:31:00
-    ///
-    /// day_begin: 缺省值 8:30:00
-    ///
-    /// day_end: 缺省值 15:30:00
-    pub fn set_config(
-        &mut self,
-        tday_shift_nanos: i64,
-        night_begin_nanos: i64,
-        night_end_nanos: i64,
-        day_begin_nanos: i64,
-        day_end_nanos: i64,
-    ) -> Result<()> {
-        let tday_shift = time_from_midnight_nanos(tday_shift_nanos);
-        let night_begin = time_from_midnight_nanos(night_begin_nanos);
-        let night_end = time_from_midnight_nanos(night_end_nanos);
-        let day_begin = time_from_midnight_nanos(day_begin_nanos);
-        let day_end = time_from_midnight_nanos(day_end_nanos);
-        self.entity
-            .set_config(&tday_shift, &night_begin, &night_end, &day_begin, &day_end)
-    }
 
     /// 前一交易日
     pub fn prev_tday(&self) -> i32 {
@@ -288,14 +258,7 @@ mod ffi {
 
         fn reset(self: &mut TradeCalendarPP, start_time_nanos: i64) -> Result<()>;
         fn is_trading(self: &TradeCalendarPP) -> bool;
-        fn set_config(
-            self: &mut TradeCalendarPP,
-            tday_shift: i64,
-            night_begin: i64,
-            night_end: i64,
-            day_begin: i64,
-            day_end: i64,
-        ) -> Result<()>;
+        fn set_config(self: &mut TradeCalendarPP, cfg: &TradingCheckConfigPP) -> Result<()>;
 
         fn get_config(self: &TradeCalendarPP) -> TradingCheckConfigPP;
 
@@ -370,5 +333,30 @@ impl TradeCalendarPP {
             day_begin: time_to_midnight_nanos(&cfg.day_begin),
             day_end: time_to_midnight_nanos(&cfg.day_end),
         }
+    }
+
+    /// 重置日期边界的一些配置,
+    /// 调用此函数之后，可以调用time_changed()刷新状态
+    ///
+    /// tday_shift: 交易日切换的时间点，缺省值 19:30:00, 影响trading_day()/prev_tday()/next_tday()
+    ///
+    /// 以下4个配置影响 is_trading()
+    ///
+    /// night_begin: 缺省值 20:30:00
+    ///
+    /// night_end: 缺省值 2:31:00
+    ///
+    /// day_begin: 缺省值 8:30:00
+    ///
+    /// day_end: 缺省值 15:30:00
+    pub fn set_config(&mut self, cfg: &ffi::TradingCheckConfigPP) -> Result<()> {
+        let cfg1 = tradecalendar::TradingCheckConfig {
+            tday_shift: time_from_midnight_nanos(cfg.tday_shift),
+            night_begin: time_from_midnight_nanos(cfg.night_begin),
+            night_end: time_from_midnight_nanos(cfg.night_end),
+            day_begin: time_from_midnight_nanos(cfg.day_begin),
+            day_end: time_from_midnight_nanos(cfg.day_end),
+        };
+        self.entity.set_config(&cfg1)
     }
 }

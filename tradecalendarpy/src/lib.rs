@@ -207,9 +207,14 @@ impl TradeCalendar {
         day_begin: NaiveTime,
         day_end: NaiveTime,
     ) -> PyResult<()> {
-        self.entity
-            .set_config(&tday_shift, &night_begin, &night_end, &day_begin, &day_end)
-            .map_err(to_pyerr)
+        let cfg = tradecalendar::TradingCheckConfig {
+            tday_shift,
+            night_begin,
+            night_end,
+            day_begin,
+            day_end,
+        };
+        self.entity.set_config(&cfg).map_err(to_pyerr)
     }
 
     pub fn get_config(&self) -> (NaiveTime, NaiveTime, NaiveTime, NaiveTime, NaiveTime) {

@@ -488,6 +488,7 @@ pub trait TradingdayCache {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// 用来检测当前时间点是否交易, 及交易日切换的一些配置项
+#[derive(Copy, Clone)]
 pub struct TradingCheckConfig {
     /// 夜盘属于下一个交易日，这个变量指示什么时间点进行切换，一般是夜里19:00~20点，缺省19:30
     pub tday_shift: MyTimeType,
@@ -604,38 +605,26 @@ impl TradeCalendar {
     /// day_begin: 缺省值 8:30:00
     ///
     /// day_end: 缺省值 15:30:00
-    pub fn set_config(
-        &mut self,
-        tday_shift: &MyTimeType,
-        night_begin: &MyTimeType,
-        night_end: &MyTimeType,
-        day_begin: &MyTimeType,
-        day_end: &MyTimeType,
-    ) -> Result<()> {
-        if tday_shift >= &make_time(21, 0, 0) || tday_shift <= &make_time(16, 0, 0) {
+    pub fn set_config(&mut self, cfg: &TradingCheckConfig) -> Result<()> {
+        if cfg.tday_shift >= make_time(21, 0, 0) || cfg.tday_shift <= make_time(16, 0, 0) {
             return Err(anyhow!("TradeCalendar: `tday_shift`一般在夜里19~20."));
         }
-        if night_begin < day_end {
+        if cfg.night_begin < cfg.day_end {
             return Err(anyhow!(
                 "TradeCalendar: `night_begin` should big than `day_end`."
             ));
         }
-        if day_end <= day_begin {
+        if cfg.day_end <= cfg.day_begin {
             return Err(anyhow!(
                 "TradeCalendar: `day_end` should big than `day_begin`."
             ));
         }
-        if day_begin <= night_end {
+        if cfg.day_begin <= cfg.night_end {
             return Err(anyhow!(
                 "TradeCalendar: `day_begin` should big than `night_end`."
             ));
         }
-
-        self.cfg.tday_shift = tday_shift.clone();
-        self.cfg.night_begin = night_begin.clone();
-        self.cfg.night_end = night_end.clone();
-        self.cfg.day_begin = day_begin.clone();
-        self.cfg.day_end = day_end.clone();
+        self.cfg = *cfg;
         Ok(())
     }
 

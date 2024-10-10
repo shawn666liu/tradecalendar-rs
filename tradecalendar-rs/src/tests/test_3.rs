@@ -99,19 +99,21 @@ mod tests {
         // println!("\ncsv result is\n{}", data);
 
         let mut mgr = TradeCalendar::new();
-        mgr.set_config(
-            &make_time(19, 30, 0),
-            &make_time(20, 30, 0),
-            &make_time(2, 31, 0),
-            &make_time(8, 30, 0),
-            &make_time(15, 30, 0),
-        )?;
+        let mut cfg = mgr.get_config().clone();
+        cfg.tday_shift = make_time(15, 30, 0);
+        assert!(mgr.set_config(&cfg).is_err());
+        // 注意: 交易日在傍晚19:30切换
+        cfg.tday_shift = make_time(19, 30, 0);
+        mgr.set_config(&cfg)?;
 
         mgr.reload(list)?;
+        let now = mgr.current_time();
+        println!("init time = {}", now);
+
         let td = mgr.get_next_trading_day(&y20210101, 1)?;
-        assert_eq!(td.date, y20210104,);
+        assert_eq!(td.date, y20210104);
         let td = mgr.get_next_trading_day(&y20210102, 1)?;
-        assert_eq!(td.date, y20210104,);
+        assert_eq!(td.date, y20210104);
         let td = mgr.get_next_trading_day(&y20210104, 1)?;
         assert_eq!(td.date, y20210105);
         let td = mgr.get_next_trading_day(&y20210104, 4)?;
@@ -124,13 +126,16 @@ mod tests {
         assert_eq!(td.date, y20210105);
 
         let datetime = date_at_hms(&y20210105, 9, 10, 5);
-        let (old_tday, curr_tday, old_date, curr_date, opt_err) =
-            mgr.time_changed(&datetime, false)?;
+        let tmchange = mgr.time_changed(&datetime, false)?;
+        println!("timechange result: {:#?}", tmchange);
+
+        let (old_tday, curr_tday, old_date, curr_date, opt_err) = tmchange;
         assert_ne!(old_date, curr_date);
         assert_ne!(old_tday, curr_tday);
         assert!(opt_err.is_none());
         assert_eq!(mgr.is_trading(), true);
 
+        // 注意: 交易日在傍晚19:30切换
         let datetime = date_at_hms(&y20210108, 19, 28, 30);
         let (old_tday, curr_tday, old_date, curr_date, opt_err) =
             mgr.time_changed(&datetime, false)?;

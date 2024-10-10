@@ -12,8 +12,10 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = "*"
-tradecalendar = { version = "*", path = "../tradecalendar-rs" }
 cxx = "*"
+tradecalendar = { version = "*", path = "../tradecalendar-rs", default-features = false, features = [
+    "with-chrono",
+] }
 
 [build-dependencies]
 cxx-build = "*"
