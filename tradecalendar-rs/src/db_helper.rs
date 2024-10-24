@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Result};
 use arrow::array::{Array, BooleanArray, Date32Array, Int64Array};
 use arrow::datatypes::DataType;
-// use arrow_array::{Array, BooleanArray, Date32Array, Int64Array};
-// use arrow_schema::DataType;
+use clickhouse::Client;
+use clickhouse::Row;
 use connectorx::{get_arrow::get_arrow, source_router::SourceConn, sql::CXQuery};
+use serde::Deserialize;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -16,7 +17,11 @@ use crate::tradecalendar::Tradingday;
 /// 2) mysql://user:passwd@localhost:3306/dbname
 ///
 /// query: 5 fields required, keep the order of feilds,
-/// select date,morning,trading,night,next from your_table where xxx order by date;
+/// select date,morning,trading,night,next from your_table where date>'yyyy-mm-dd' order by date;
+///
+/// for clickhouse
+/// conn  -> "clickhouse://readonly:readonly@192.168.9.122:8123/futuredb"
+/// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'2024-01-01' ORDER BY date";
 pub fn load_tradingdays_from_db(
     conn: &str,
     query: &str,
@@ -25,6 +30,11 @@ pub fn load_tradingdays_from_db(
     if conn.is_empty() || query.is_empty() {
         return Err(anyhow!("connection string or query is empty"));
     }
+
+    if conn.to_lowercase().starts_with("clickhouse://") {
+        return load_tradingdays_from_clickhouse(conn, query);
+    }
+
     let mut source_conn = SourceConn::try_from(conn)?;
     if let Some(mode) = proto {
         source_conn.proto = mode;
@@ -126,3 +136,65 @@ fn cast_to_concret_array<T: 'static>(arrary: &Arc<dyn Array>, index: usize) -> R
 //         _ => return Err(anyhow!("")),
 //     }
 // }
+
+#[allow(dead_code)]
+#[derive(Row, Deserialize)]
+struct TradingDayRow {
+    pub date: u16,
+    pub morning: bool,
+    pub trading: bool,
+    pub night: bool,
+    pub next: u16,
+}
+
+fn to_tradingday(td: &TradingDayRow) -> Tradingday {
+    Tradingday {
+        date: date_from_days_since_epoch(td.date as i32),
+        morning: td.morning,
+        trading: td.trading,
+        night: td.night,
+        next: date_from_days_since_epoch(td.next as i32),
+    }
+}
+
+/// conn -> clickhouse://user:passwd@localhost:8123/dbname
+/// http client, so port must be 8123
+/// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'yyyy-mm-dd' ORDER BY date;"
+/// https://github.com/ClickHouse/clickhouse-rs
+pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<Tradingday>> {
+    // conn -> user:passwd@localhost:8123/dbname
+    let connvec = conn
+        .split("://")
+        .last()
+        .and_then(|s| Some(s.split('@').collect::<Vec<&str>>()))
+        .ok_or_else(|| anyhow!("parse connection string failed"))?;
+    // url_db -> ["localhost:8123", "dbname"]
+    let url_db = connvec
+        .last()
+        .and_then(|s| Some(s.split("/").collect::<Vec<&str>>()))
+        .ok_or_else(|| anyhow!("connection string has no url"))?;
+    if url_db.len() != 2 {
+        return Err(anyhow!("bad format for db url and database"));
+    }
+
+    let rt = tokio::runtime::Runtime::new()?;
+
+    let res = rt.block_on(async {
+        let mut client = Client::default()
+            .with_url(format!("http://{}", url_db[0]))
+            .with_database(url_db[1]);
+        if connvec.len() > 1 {
+            // may has user and password
+            let up: Vec<_> = connvec[0].split(':').collect();
+            if up.len() != 2 {
+                return Err(anyhow!("bad format for db user and passwd"));
+            }
+            client = client.with_user(up[0]).with_password(up[1]);
+        }
+        let rows = client.query(query).fetch_all::<TradingDayRow>().await?;
+        let result: Vec<_> = rows.iter().map(to_tradingday).collect();
+        Ok(result)
+    })?;
+
+    return Ok(res);
+}

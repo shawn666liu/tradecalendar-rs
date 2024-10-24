@@ -5,11 +5,19 @@ import datetime as dt
 def test_calendar():
     dburl = "postgresql://readonly:readonly@192.168.9.122:5432/future_info"
     proto = None
+    # 旧版的clickhouse server支持mysql text protocol
     # dburl = "mysql://readonly:readonly@192.168.100.208:9005/futuredb"
     # proto = "text" # access clickhouse via mysql `text` protocol
-    sql = "select date,morning,trading,night,next from calendar where date>'2020-01-01' order by date;"
-    cal = calendar.load_calendar(dburl, sql, proto, csv_file=None, start_date=None)
-    # cal = calendar.load_buildin_calendar()
+    sql = "select date,morning,trading,night,next from calendar where date>'2020-01-01' order by date"
+
+    # 新版直接使用clickhouse接口读取,不用connectorx
+    dburl = "clickhouse://readonly:readonly@192.168.9.122:8123/futuredb"
+    sql = "SELECT ?fields FROM futuredb.calendar WHERE date>='2024-01-01' ORDER BY date"
+    cal = calendar.get_calendar(
+        dburl, sql, proto, csv_file=None, start_date=dt.date(2024, 1, 1)
+    )
+    # cal = calendar.get_buildin_calendar()
+    print(f"internal list is from {cal.min_date()} to {cal.max_date()}")
 
     # 无状态
     date = dt.date(2024, 10, 11)

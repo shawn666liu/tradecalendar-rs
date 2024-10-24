@@ -65,10 +65,22 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
             },
         }
     }
-    let res1 = load_tradingdays_from_db(db_conn, query, proto).ok();
-    let res2 = load_tradingdays_buildin().ok();
-    let res3 = csv_file.and_then(|f| Tradingday::load_csv_file(f).ok());
-    let res4 = _find_latest_(res1, res2);
+    let res1 = match load_tradingdays_from_db(db_conn, query, proto) {
+        Ok(r) => Some(r),
+        Err(e) => {
+            println!("load_tradingdays_from_db() error: {}", e);
+            None
+        }
+    };
+    let res2 = csv_file.and_then(|f| match Tradingday::load_csv_file(f) {
+        Ok(r) => Some(r),
+        Err(e) => {
+            println!("load_csv_file() error: {}", e);
+            None
+        }
+    });
+    let res3 = _find_latest_(res1, res2);
+    let res4 = load_tradingdays_buildin().ok();
     _find_latest_(res3, res4).ok_or(anyhow!("no tradingdays loaded"))
 }
 

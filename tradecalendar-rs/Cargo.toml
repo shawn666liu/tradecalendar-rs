@@ -37,7 +37,8 @@ connectorx = { version = "0.3.3", features = [
 # 注意: 这个version必须要跟connectorx引用的arrow版本一致
 # 从connectorx项目的Cargo.toml文件里面获取
 arrow = { version = "46.0.0" }
-
+clickhouse = { version = "0.13.1" }
+tokio = { version = "1.41.0", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 crossbeam-channel = "*"
