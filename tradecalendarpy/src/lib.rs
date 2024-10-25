@@ -81,12 +81,14 @@ impl TradeCalendar {
     fn is_trading_day(&self, date: NaiveDate) -> PyResult<bool> {
         self.entity.is_trading_day(&date).map_err(to_pyerr)
     }
+    #[pyo3(signature = (date, num=1))]
     fn get_next_trading_day(&self, date: NaiveDate, num: usize) -> PyResult<NaiveDate> {
         self.entity
             .get_next_trading_day(&date, num)
             .and_then(|t| Ok(t.date))
             .map_err(to_pyerr)
     }
+    #[pyo3(signature = (date, num=1))]
     fn get_prev_trading_day(&self, date: NaiveDate, num: usize) -> PyResult<NaiveDate> {
         self.entity
             .get_prev_trading_day(&date, num)

@@ -17,11 +17,11 @@ use crate::tradecalendar::Tradingday;
 /// 2) mysql://user:passwd@localhost:3306/dbname
 ///
 /// query: 5 fields required, keep the order of feilds,
-/// select date,morning,trading,night,next from your_table where date>'yyyy-mm-dd' order by date;
+/// select date,morning,trading,night,next from your_table where date>'yyyy-mm-dd' order by date
 ///
 /// for clickhouse
 /// conn  -> "clickhouse://readonly:readonly@192.168.9.122:8123/futuredb"
-/// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'2024-01-01' ORDER BY date";
+/// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'2024-01-01' ORDER BY date"
 pub fn load_tradingdays_from_db(
     conn: &str,
     query: &str,
@@ -159,7 +159,7 @@ fn to_tradingday(td: &TradingDayRow) -> Tradingday {
 
 /// conn -> clickhouse://user:passwd@localhost:8123/dbname
 /// http client, so port must be 8123
-/// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'yyyy-mm-dd' ORDER BY date;"
+/// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'yyyy-mm-dd' ORDER BY date"
 /// https://github.com/ClickHouse/clickhouse-rs
 pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<Tradingday>> {
     // conn -> user:passwd@localhost:8123/dbname
