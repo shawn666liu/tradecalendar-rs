@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tradecalendar"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Shawn Liu <shawn666.liu@hotmail.com>"]
 description = "中国市场期货股票交易日历"
 
