@@ -23,7 +23,7 @@ struct TradeCalendar {
     entity: tradecalendar::TradeCalendar,
 }
 
-// #[gen_stub_pyfunction]
+#[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (start_date=None))]
 fn get_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
@@ -32,7 +32,7 @@ fn get_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar
         .map_err(to_pyerr)
 }
 
-// #[gen_stub_pyfunction]
+#[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (csv_file, start_date=None))]
 fn get_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
@@ -41,7 +41,7 @@ fn get_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<T
         .map_err(to_pyerr)
 }
 
-// #[gen_stub_pyfunction]
+#[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (db_conn, query, proto=None, csv_file=None, start_date=None))]
 fn get_calendar(
@@ -56,9 +56,10 @@ fn get_calendar(
         .map_err(to_pyerr)
 }
 
-// #[gen_stub_pymethods]
+#[gen_stub_pymethods]
 #[pymethods]
 impl TradeCalendar {
+    #[pyo3(signature = (db_conn, query, proto=None, csv_file=None, start_date=None))]
     fn reload(
         &mut self,
         db_conn: &str,
@@ -110,7 +111,7 @@ impl TradeCalendar {
     fn get_date_detail<'a>(&self, py: Python<'a>, theday: NaiveDate) -> Option<Bound<'a, PyDict>> {
         match self.entity.get_date_detail(&theday) {
             Some(t) => {
-                let d = PyDict::new_bound(py);
+                let d = PyDict::new(py);
                 let _ = d.set_item("date", t.date);
                 let _ = d.set_item("morning", t.morning);
                 let _ = d.set_item("trading", t.trading);
@@ -162,7 +163,7 @@ impl TradeCalendar {
     //////////////////////////////////////////////////////////////////////////////////
     // 以下为有状态时的接口
     //////////////////////////////////////////////////////////////////////////////////
-
+    #[pyo3(signature = (start_time=None))]
     fn reset(&mut self, start_time: Option<NaiveDateTime>) -> PyResult<()> {
         self.entity.reset(start_time.as_ref()).map_err(to_pyerr)
     }

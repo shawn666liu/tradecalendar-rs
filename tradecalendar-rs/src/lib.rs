@@ -66,14 +66,30 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
         }
     }
     let res1 = match load_tradingdays_from_db(db_conn, query, proto) {
-        Ok(r) => Some(r),
+        Ok(r) => {
+            println!(
+                "load_tradingdays_from_db() count {}, first {:?}, last {:?}",
+                r.len(),
+                r.first(),
+                r.last()
+            );
+            Some(r)
+        }
         Err(e) => {
             println!("load_tradingdays_from_db() error: {}", e);
             None
         }
     };
     let res2 = csv_file.and_then(|f| match Tradingday::load_csv_file(f) {
-        Ok(r) => Some(r),
+        Ok(r) => {
+            println!(
+                "load_csv_file() count {}, first {:?}, last {:?}",
+                r.len(),
+                r.first(),
+                r.last()
+            );
+            Some(r)
+        }
         Err(e) => {
             println!("load_csv_file() error: {}", e);
             None

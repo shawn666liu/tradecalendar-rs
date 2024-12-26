@@ -178,7 +178,7 @@ pub fn tradingdays_to_calendar(trading_days: &Vec<MyDateType>) -> Vec<Tradingday
     return result;
 }
 
-/// 生成 holiday.sql用于postgres
+/// 生成 pg_holiday.sql用于postgres
 pub fn gen_holiday_sql<P: AsRef<Path>>(
     out_dir: P,
     holidays: &[MyDateType],
@@ -221,7 +221,7 @@ pub fn gen_holiday_sql<P: AsRef<Path>>(
 
 /// 生成交易日csv文件
 ///
-/// 生成postgresql的trade_day表，只有_date一个字段
+/// 生成postgresql的gp_trade_day表，只有_date一个字段
 pub fn gen_trade_day_csv<P: AsRef<Path>>(tdays: &Vec<MyDateType>, out_dir: P) -> Result<()> {
     let out_dir = out_dir.as_ref();
     if !out_dir.exists() {
@@ -260,7 +260,7 @@ pub fn gen_trade_day_csv<P: AsRef<Path>>(tdays: &Vec<MyDateType>, out_dir: P) ->
     Ok(())
 }
 
-/// 生成calendar.csv文件
+/// 生成calendar_part.csv文件
 ///
 /// 生成clickhouse所需的futuredb.calendar表的sql文件
 pub fn gen_calendar_csv<P: AsRef<Path>>(
@@ -272,7 +272,7 @@ pub fn gen_calendar_csv<P: AsRef<Path>>(
         std::fs::create_dir_all(out_dir)
             .expect(&format!("create out dir `{}` failed.", out_dir.display()));
     }
-    let p1 = out_dir.join("calendar.csv");
+    let p1 = out_dir.join("calendar_part.csv");
     let mut f1 = File::create(&p1).with_context(|| p1.display().to_string())?;
 
     let p2 = out_dir.join("ch_calendar.sql");
@@ -335,8 +335,8 @@ pub fn gen_calendar_csv<P: AsRef<Path>>(
     writeln!(f2, "")?;
     // 优化表，删除重复
     writeln!(f2, "optimize table futuredb.calendar final;")?;
-    println!("calendar.csv: {}", std::fs::canonicalize(p1)?.display());
-    println!("ch_calendar.sql: {}", std::fs::canonicalize(p2)?.display());
+    println!("{}", std::fs::canonicalize(p1)?.display());
+    println!("{}", std::fs::canonicalize(p2)?.display());
 
     return Ok(());
 }
