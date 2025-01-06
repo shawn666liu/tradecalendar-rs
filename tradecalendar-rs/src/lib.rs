@@ -8,7 +8,7 @@ use std::path::Path;
 
 use anyhow::Result;
 pub use db_helper::load_tradingdays_from_db;
-use jcswitch::MyDateType;
+use jcswitch::{get_now, MyDateType};
 
 pub use crate::tradecalendar::*;
 
@@ -68,7 +68,8 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
     let res1 = match load_tradingdays_from_db(db_conn, query, proto) {
         Ok(r) => {
             println!(
-                "load_tradingdays_from_db() count {}, first {:?}, last {:?}",
+                "==> {}, load_tradingdays_from_db() count {}, first {:?}, last {:?}",
+                get_now(),
                 r.len(),
                 r.first(),
                 r.last()
@@ -76,14 +77,15 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
             Some(r)
         }
         Err(e) => {
-            println!("load_tradingdays_from_db() error: {}", e);
+            println!("==> {}, load_tradingdays_from_db() error: {}", get_now(), e);
             None
         }
     };
     let res2 = csv_file.and_then(|f| match Tradingday::load_csv_file(f) {
         Ok(r) => {
             println!(
-                "load_csv_file() count {}, first {:?}, last {:?}",
+                "==> {}, load_csv_file() count {}, first {:?}, last {:?}",
+                get_now(),
                 r.len(),
                 r.first(),
                 r.last()
@@ -91,7 +93,7 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
             Some(r)
         }
         Err(e) => {
-            println!("load_csv_file() error: {}", e);
+            println!("==> {}, load_csv_file() error: {}", get_now(), e);
             None
         }
     });
