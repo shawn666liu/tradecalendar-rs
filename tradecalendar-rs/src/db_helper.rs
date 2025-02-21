@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use arrow::array::{Array, BooleanArray, Date32Array, Int64Array};
 use arrow::datatypes::DataType;
 use clickhouse::Client;
@@ -40,7 +40,7 @@ pub fn load_tradingdays_from_db(
         source_conn.proto = mode;
     }
     let queries = &[CXQuery::from(query)];
-    let destination = get_arrow(&source_conn, None, queries)?;
+    let destination = get_arrow(&source_conn, None, queries, None)?;
     let data = destination.arrow()?;
     let total = data.iter().fold(0, |acc, x| acc + x.num_rows());
     let mut res = Vec::with_capacity(total);

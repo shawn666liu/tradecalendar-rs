@@ -4,6 +4,8 @@
 
 ### Python绑定
 注意，不同的python版本需要生成单独的wheel包  
+- 生成/更新stub  
+cargo run --bin stub_gen  
 - 进入子目录  
 cd tradecalendarpy
 - 切换到需要的虚拟环境  

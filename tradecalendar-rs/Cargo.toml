@@ -1,5 +1,5 @@
 [package]
-edition = "2021"
+edition = "2024"
 name = "tradecalendar"
 version = "0.1.2"
 authors = ["Shawn Liu <shawn666.liu@hotmail.com>"]
@@ -27,7 +27,7 @@ encoding_rs_io = "*"
 log = "*"
 serde = { version = '*', features = ["derive"] }
 # serde_json = "*"
-connectorx = { version = "0.3.3", features = [
+connectorx = { version = "0.4.2", features = [
     "src_mysql",
     # "src_mssql",
     "src_postgres",
@@ -36,7 +36,7 @@ connectorx = { version = "0.3.3", features = [
 ] }
 # 注意: 这个version必须要跟connectorx引用的arrow版本一致
 # 从connectorx项目的Cargo.toml文件里面获取
-arrow = { version = "46.0.0" }
+arrow = { version = "53.0.0" }
 clickhouse = { version = "0.13.1" }
 tokio = { version = "1.41.0", features = ["rt-multi-thread"] }
 
