@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use tradecalendar::jcswitch::{
     date_from_days_since_epoch, date_to_days_since_epoch, datetime_from_timestamp_nanos, make_date,
@@ -143,7 +143,7 @@ impl TradeCalendarPP {
     //////////////////////////////////////////////////////////////////////////////////
 
     pub fn reset(&mut self, start_time_nanos: i64) -> Result<()> {
-        let start = if start_time_nanos == 0 {
+        let start = if start_time_nanos > 0 {
             Some(datetime_from_timestamp_nanos(start_time_nanos))
         } else {
             None
