@@ -142,6 +142,7 @@ impl TradeCalendarPP {
     // 以下为有状态时的接口
     //////////////////////////////////////////////////////////////////////////////////
 
+    // C++如果输入为零，则理解为None
     pub fn reset(&mut self, start_time_nanos: i64) -> Result<()> {
         let start = if start_time_nanos > 0 {
             Some(datetime_from_timestamp_nanos(start_time_nanos))
