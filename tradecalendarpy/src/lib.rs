@@ -1,13 +1,13 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use pyo3::Python;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::Python;
 
 use pyo3_stub_gen::define_stub_info_gatherer;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
 
 use tradecalendar::{
-    self, jcswitch::make_date, reload_calendar, NotTradingSearchMethod, TradingdayCache,
+    self, NotTradingSearchMethod, TradingdayCache, jcswitch::make_date, reload_calendar,
 };
 
 fn to_pyerr(e: anyhow::Error) -> PyErr {
@@ -218,6 +218,7 @@ impl TradeCalendar {
         self.entity.set_config(&cfg).map_err(to_pyerr)
     }
 
+    /// 返回值参看set_config
     pub fn get_config(&self) -> (NaiveTime, NaiveTime, NaiveTime, NaiveTime, NaiveTime) {
         let cfg = self.entity.get_config();
         (
