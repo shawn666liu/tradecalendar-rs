@@ -3,10 +3,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::Python;
 
-use pyo3_stub_gen::{
-    define_stub_info_gatherer, derive::gen_stub_pyclass, derive::gen_stub_pyfunction,
-    derive::gen_stub_pymethods,
-};
+use pyo3_stub_gen::define_stub_info_gatherer;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
 
 use tradecalendar::{
     self, jcswitch::make_date, reload_calendar, NotTradingSearchMethod, TradingdayCache,
