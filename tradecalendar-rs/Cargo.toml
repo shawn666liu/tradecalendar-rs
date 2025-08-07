@@ -21,7 +21,6 @@ with-jiff = ["jiff"]
 anyhow = "*"
 chrono = { version = "*", features = ["serde"], optional = true }
 jiff = { version = "*", features = ["serde"], optional = true }
-clap = "*"
 csv = "*"
 encoding_rs_io = "*"
 log = "*"
@@ -41,5 +40,6 @@ clickhouse = { version = "0.13.1" }
 tokio = { version = "1.41.0", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
+clap = "*"
 crossbeam-channel = "*"
 ctrlc = "*"

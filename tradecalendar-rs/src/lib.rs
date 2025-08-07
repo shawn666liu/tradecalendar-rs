@@ -8,7 +8,7 @@ use std::path::Path;
 
 use anyhow::Result;
 pub use db_helper::load_tradingdays_from_db;
-use jcswitch::{get_now, MyDateType};
+use jcswitch::{MyDateType, get_now};
 
 pub use crate::tradecalendar::*;
 
@@ -31,7 +31,7 @@ pub fn drain_tday_list(full_list: &mut Vec<Tradingday>, start_date: Option<MyDat
 
 /// use buildin csv file to load tradingday list.
 pub fn load_tradingdays_buildin() -> Result<Vec<Tradingday>> {
-    let csv_str = include_str!("../calendar.csv");
+    let csv_str = include_str!("../../calendar.csv");
     Tradingday::load_csv_read(csv_str.as_bytes())
 }
 

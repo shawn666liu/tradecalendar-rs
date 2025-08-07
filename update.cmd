@@ -1,1 +1,1 @@
-cargo run --bin calendar-update -- -i "./tradecalendar-rs/holidays.csv"
+cargo run --example calendar-update -- -i "./holidays.csv"
