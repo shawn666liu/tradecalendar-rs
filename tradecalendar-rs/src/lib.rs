@@ -1,19 +1,18 @@
-pub mod calendar_helper;
-mod db_helper;
+mod db_clickhouse;
+mod db_odbc;
+mod db_sqlx;
 pub mod jcswitch;
 mod tradecalendar;
 
-use anyhow::anyhow;
+use anyhow::{Result, anyhow};
 use std::path::Path;
 
-use anyhow::Result;
-pub use db_helper::load_tradingdays_from_db;
+use db_clickhouse::load_tradingdays_from_clickhouse;
+use db_odbc::load_tradingdays_from_odbc;
+use db_sqlx::load_tradingdays_from_sqlx;
 use jcswitch::{MyDateType, get_now};
 
-pub use crate::tradecalendar::*;
-
-#[cfg(test)]
-mod tests;
+pub use tradecalendar::*;
 
 #[cfg(all(feature = "with-chrono", feature = "with-jiff"))]
 compile_error!("features \"with-chrono\" and \"with-jiff\" cannot be enabled at the same time");
@@ -39,7 +38,6 @@ pub fn load_tradingdays_buildin() -> Result<Vec<Tradingday>> {
 pub fn load_latest_tradingdays<P: AsRef<Path>>(
     db_conn: &str,
     query: &str,
-    proto: Option<String>,
     csv_file: Option<P>,
 ) -> Result<Vec<Tradingday>> {
     // 内部函数
@@ -65,7 +63,7 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
             },
         }
     }
-    let res1 = match load_tradingdays_from_db(db_conn, query, proto) {
+    let res1 = match load_tradingdays_from_db(db_conn, query) {
         Ok(r) => {
             println!(
                 "==> {}, load_tradingdays_from_db() count {}, first {:?}, last {:?}",
@@ -126,8 +124,8 @@ pub fn get_csv_calendar<P: AsRef<Path>>(
 }
 
 /// 从数据库加载交易日并创建TradeCalendar对象
-pub fn get_db_calendar(db_conn: &str, query: &str, proto: Option<String>) -> Result<TradeCalendar> {
-    let full_list = load_tradingdays_from_db(db_conn, query, proto)?;
+pub fn get_db_calendar(db_conn: &str, query: &str) -> Result<TradeCalendar> {
+    let full_list = load_tradingdays_from_db(db_conn, query)?;
     let mut calendar = TradeCalendar::new();
     calendar.reload(full_list)?;
     Ok(calendar)
@@ -137,11 +135,10 @@ pub fn get_db_calendar(db_conn: &str, query: &str, proto: Option<String>) -> Res
 pub fn get_calendar<P: AsRef<Path>>(
     db_conn: &str,
     query: &str,
-    proto: Option<String>,
     csv_file: Option<P>,
     start_date: Option<MyDateType>,
 ) -> Result<TradeCalendar> {
-    let mut vec = load_latest_tradingdays(db_conn, query, proto, csv_file)?;
+    let mut vec = load_latest_tradingdays(db_conn, query, csv_file)?;
     if vec.is_empty() {
         return Err(anyhow!("tradingday list is empty"));
     }
@@ -163,11 +160,10 @@ pub fn reload_calendar<P: AsRef<Path>>(
     calendar: &mut TradeCalendar,
     db_conn: &str,
     query: &str,
-    proto: Option<String>,
     csv_file: Option<P>,
     start_date: Option<MyDateType>,
 ) -> Result<()> {
-    let mut vec = load_latest_tradingdays(db_conn, query, proto, csv_file)?;
+    let mut vec = load_latest_tradingdays(db_conn, query, csv_file)?;
     if vec.is_empty() {
         return Err(anyhow!("tradingday list is empty"));
     }
@@ -180,4 +176,27 @@ pub fn reload_calendar<P: AsRef<Path>>(
         "tradingday list becomes empty after filter by `{:?}`",
         start_date
     ));
+}
+
+/// load Tradingday from db
+/// conn format:  
+/// 1) postgres://user:passwd@localhost:5432/dbname
+/// 2) mysql://user:passwd@localhost:3306/dbname
+/// 3) clickhouse://user:passwd@localhost:8123/dbname
+/// 4) odbc connection string, Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=username;PWD=password;Database=dbname
+///
+/// query: 5 fields required, keep the order of feilds,
+/// select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
+pub fn load_tradingdays_from_db(conn: &str, query: &str) -> Result<Vec<Tradingday>> {
+    if conn.is_empty() || query.is_empty() {
+        return Err(anyhow!("connection string or query is empty"));
+    }
+    let lower = conn.to_lowercase();
+    if lower.starts_with("clickhouse://") {
+        return load_tradingdays_from_clickhouse(conn, query);
+    } else if lower.starts_with("mysql") || lower.starts_with("postgres") {
+        return load_tradingdays_from_sqlx(conn, query);
+    } else {
+        load_tradingdays_from_odbc(conn, query)
+    }
 }

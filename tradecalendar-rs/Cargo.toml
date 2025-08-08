@@ -1,7 +1,7 @@
 [package]
 edition = "2024"
 name = "tradecalendar"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Shawn Liu <shawn666.liu@hotmail.com>"]
 description = "中国市场期货股票交易日历"
 
@@ -13,31 +13,28 @@ default = ["with-chrono"]
 with-chrono = ["chrono"]
 with-jiff = ["jiff"]
 
+# support for jiff removed!!! since sqlx supports chrono only
 # cargo build --features "with-jiff"
 # cargo build --features "with-chrono" --no-default-features
 # in Cargo.toml, should use "default-features = false"
 
 [dependencies]
 anyhow = "*"
-chrono = { version = "*", features = ["serde"], optional = true }
-jiff = { version = "*", features = ["serde"], optional = true }
+chrono = { version = "^0.4", features = ["serde"], optional = true }
+clickhouse = { version = "0.13.1" }
 csv = "*"
 encoding_rs_io = "*"
+jiff = { version = "*", features = ["serde"], optional = true }
 log = "*"
+odbc-api = "14.2.1"
 serde = { version = '*', features = ["derive"] }
-# serde_json = "*"
-connectorx = { version = "0.4.2", features = [
-    "src_mysql",
-    # "src_mssql",
-    "src_postgres",
-    "src_sqlite",
-    "dst_arrow",
+tokio = { version = "^1.47", features = ["rt-multi-thread"] }
+sqlx = { version = "^0.8", features = [
+    "mysql",
+    "postgres",
+    "chrono",
+    "runtime-tokio",
 ] }
-# 注意: 这个version必须要跟connectorx引用的arrow版本一致
-# 从connectorx项目的Cargo.toml文件里面获取
-arrow = { version = "53.0.0" }
-clickhouse = { version = "0.13.1" }
-tokio = { version = "1.41.0", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 clap = "*"

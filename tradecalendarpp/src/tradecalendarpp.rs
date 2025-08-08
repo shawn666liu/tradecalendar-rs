@@ -25,18 +25,16 @@ fn get_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalend
 fn get_calendar(
     db_conn: String,
     query: String,
-    proto: String,
     csv_file: String,
     start_date: i32,
 ) -> Result<Box<TradeCalendarPP>> {
     let start_date = date_from_days_since_epoch(start_date);
-    let proto = if proto.is_empty() { None } else { Some(proto) };
     let csv_file = if csv_file.is_empty() {
         None
     } else {
         Some(csv_file)
     };
-    tradecalendar::get_calendar(&db_conn, &query, proto, csv_file, Some(start_date))
+    tradecalendar::get_calendar(&db_conn, &query, csv_file, Some(start_date))
         .and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
 }
 
@@ -45,11 +43,9 @@ impl TradeCalendarPP {
         &mut self,
         db_conn: String,
         query: String,
-        proto: String,
         csv_file: String,
         start_date: i32,
     ) -> Result<()> {
-        let proto = if proto.is_empty() { None } else { Some(proto) };
         let csv_file = if csv_file.is_empty() {
             None
         } else {
@@ -60,7 +56,6 @@ impl TradeCalendarPP {
             &mut self.entity,
             &db_conn,
             &query,
-            proto,
             csv_file,
             Some(start_date),
         )
@@ -210,21 +205,45 @@ mod ffi {
         type TradeCalendarPP;
         fn get_buildin_calendar(start_date: i32) -> Result<Box<TradeCalendarPP>>;
         fn get_csv_calendar(csv_file: String, start_date: i32) -> Result<Box<TradeCalendarPP>>;
+        /// 连接字符串：   
+        ///
+        /// postgres://user:passwd@localhost:5432/dbname  
+        ///
+        /// mysql://user:passwd@localhost:3306/dbname   
+        ///
+        /// clickhouse://user:passwd@localhost:8123/dbname
+        ///
+        /// odbc: Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=user;PWD=passwd;Database=dbname
+        ///
+        /// query: 5 fields required, keep the order of fields,
+        ///
+        /// select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
         fn get_calendar(
             db_conn: String,
             query: String,
-            proto: String,
             csv_file: String,
             start_date: i32,
         ) -> Result<Box<TradeCalendarPP>>;
 
         //////////////////////////////////////////////////////////////////////////////////
 
+        /// 连接字符串：   
+        ///
+        /// postgres://user:passwd@localhost:5432/dbname  
+        ///
+        /// mysql://user:passwd@localhost:3306/dbname   
+        ///
+        /// clickhouse://user:passwd@localhost:8123/dbname
+        ///
+        /// odbc: Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=user;PWD=passwd;Database=dbname
+        ///
+        /// query: 5 fields required, keep the order of fields,
+        ///
+        /// select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
         fn reload(
             self: &mut TradeCalendarPP,
             db_conn: String,
             query: String,
-            proto: String,
             csv_file: String,
             start_date: i32,
         ) -> Result<()>;

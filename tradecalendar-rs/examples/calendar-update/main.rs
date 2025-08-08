@@ -1,7 +1,9 @@
 // #![feature(try_blocks)]
 
-use anyhow::{anyhow, Result};
-use clap::{arg, value_parser, Command};
+mod calendar_helper;
+
+use anyhow::{Result, anyhow};
+use clap::{Command, arg, value_parser};
 use encoding_rs_io::DecodeReaderBytes;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -12,7 +14,7 @@ use chrono::NaiveDate;
 #[cfg(feature = "with-jiff")]
 use jiff::civil::Date;
 
-use tradecalendar::calendar_helper::*;
+use calendar_helper::*;
 
 // input 节假日文件格式如下
 /*

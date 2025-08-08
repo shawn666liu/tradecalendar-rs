@@ -71,4 +71,6 @@ docs/_build/
 .python-version
 
 /output
-/tradecalendar-rs/target
+
+# ignore local temp files
+z___*

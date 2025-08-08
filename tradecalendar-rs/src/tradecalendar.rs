@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use csv::*;
 use encoding_rs_io::DecodeReaderBytes;
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ pub enum NotTradingSearchMethod {
     Prev,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct Tradingday {
     pub date: MyDateType,
     pub morning: bool,
@@ -472,11 +472,7 @@ pub trait TradingdayCache {
             }
             None => {
                 // out of range, not possible here
-                if tday.trading {
-                    tday.date
-                } else {
-                    tday.next
-                }
+                if tday.trading { tday.date } else { tday.next }
             }
         };
         return res;
