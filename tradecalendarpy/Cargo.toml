@@ -1,6 +1,6 @@
 [package]
 name = "tradecalendarpy"
-version = "0.1.0"
+version = "0.1.3"
 edition = "2024"
 authors = ["Shawn Liu <shawn666.liu@hotmail.com>"]
 description = "交易日历python封装"
@@ -11,12 +11,10 @@ name = "tradecalendarpy"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-tradecalendar = { version = "*", path = "../tradecalendar-rs", default-features = false, features = [
-    "with-chrono",
-] }
+tradecalendar = { version = "*", path = "../tradecalendar-rs" }
 anyhow = "*"
 # pyo3的版本受到pyo3-stub-gen的限制
 pyo3 = { version = "*", features = ["extension-module", "chrono"] }
-chrono = "0.4"
+chrono = "^0.4"
 # pyo3-stub-gen = { version = "0.7.0", git = "https://github.com/Jij-Inc/pyo3-stub-gen.git" }
 pyo3-stub-gen = { version = "0.6.2" }

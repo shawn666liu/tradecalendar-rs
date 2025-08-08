@@ -5,7 +5,22 @@ import datetime
 import typing
 
 class TradeCalendar:
-    def reload(self, db_conn,query,proto = ...,csv_file = ...,start_date = ...) -> None:
+    def reload(self, db_conn,query,csv_file = ...,start_date = ...) -> None:
+        r"""
+        连接字符串：   
+        
+        postgres://user:passwd@localhost:5432/dbname  
+        
+        mysql://user:passwd@localhost:3306/dbname   
+        
+        clickhouse://user:passwd@localhost:8123/dbname
+        
+        odbc: Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=user;PWD=passwd;Database=dbname
+        
+        query: 5 fields required, keep the order of fields,
+        
+        select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
+        """
         ...
 
     def is_trading_day(self, date:datetime.date) -> bool:
@@ -90,6 +105,9 @@ class TradeCalendar:
         ...
 
     def get_config(self) -> tuple[datetime.time, datetime.time, datetime.time, datetime.time, datetime.time]:
+        r"""
+        返回值参看set_config
+        """
         ...
 
     def prev_tday(self) -> datetime.date:
@@ -114,7 +132,22 @@ class TradeCalendar:
 def get_buildin_calendar(start_date = ...) -> TradeCalendar:
     ...
 
-def get_calendar(db_conn,query,proto = ...,csv_file = ...,start_date = ...) -> TradeCalendar:
+def get_calendar(db_conn,query,csv_file = ...,start_date = ...) -> TradeCalendar:
+    r"""
+    连接字符串：   
+    
+    postgres://user:passwd@localhost:5432/dbname  
+    
+    mysql://user:passwd@localhost:3306/dbname   
+    
+    clickhouse://user:passwd@localhost:8123/dbname
+    
+    odbc: Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=user;PWD=passwd;Database=dbname
+    
+    query: 5 fields required, keep the order of fields,
+    
+    select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
+    """
     ...
 
 def get_csv_calendar(csv_file,start_date = ...) -> TradeCalendar:

@@ -39,17 +39,29 @@ fn get_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<T
         .map_err(to_pyerr)
 }
 
+/// 连接字符串：   
+///
+/// postgres://user:passwd@localhost:5432/dbname  
+///
+/// mysql://user:passwd@localhost:3306/dbname   
+///
+/// clickhouse://user:passwd@localhost:8123/dbname
+///
+/// odbc: Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=user;PWD=passwd;Database=dbname
+///
+/// query: 5 fields required, keep the order of fields,
+///
+/// select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(signature = (db_conn, query, proto=None, csv_file=None, start_date=None))]
+#[pyo3(signature = (db_conn, query, csv_file=None, start_date=None))]
 fn get_calendar(
     db_conn: &str,
     query: &str,
-    proto: Option<String>,
     csv_file: Option<String>,
     start_date: Option<NaiveDate>,
 ) -> PyResult<TradeCalendar> {
-    tradecalendar::get_calendar(db_conn, query, proto, csv_file, start_date)
+    tradecalendar::get_calendar(db_conn, query, csv_file, start_date)
         .and_then(|r| Ok(TradeCalendar { entity: r }))
         .map_err(to_pyerr)
 }
@@ -57,24 +69,28 @@ fn get_calendar(
 #[gen_stub_pymethods]
 #[pymethods]
 impl TradeCalendar {
-    #[pyo3(signature = (db_conn, query, proto=None, csv_file=None, start_date=None))]
+    /// 连接字符串：   
+    ///
+    /// postgres://user:passwd@localhost:5432/dbname  
+    ///
+    /// mysql://user:passwd@localhost:3306/dbname   
+    ///
+    /// clickhouse://user:passwd@localhost:8123/dbname
+    ///
+    /// odbc: Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=user;PWD=passwd;Database=dbname
+    ///
+    /// query: 5 fields required, keep the order of fields,
+    ///
+    /// select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
+    #[pyo3(signature = (db_conn, query, csv_file=None, start_date=None))]
     fn reload(
         &mut self,
         db_conn: &str,
         query: &str,
-        proto: Option<String>,
         csv_file: Option<String>,
         start_date: Option<NaiveDate>,
     ) -> PyResult<()> {
-        reload_calendar(
-            &mut self.entity,
-            db_conn,
-            query,
-            proto,
-            csv_file,
-            start_date,
-        )
-        .map_err(to_pyerr)
+        reload_calendar(&mut self.entity, db_conn, query, csv_file, start_date).map_err(to_pyerr)
     }
 
     fn is_trading_day(&self, date: NaiveDate) -> PyResult<bool> {
