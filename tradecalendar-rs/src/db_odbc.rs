@@ -65,21 +65,3 @@ fn convert_odbc_date(odbc_date: &Date) -> MyDateType {
         odbc_date.day as u32,
     )
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn read_odbc() -> Result<()> {
-        let query = "SELECT date,morning,trading,night,next FROM calendar WHERE date>='2024-01-01' ORDER BY date limit 10";
-
-        let conn = "Driver={PostgreSQL Unicode};Server=192.168.9.122;UID=readonly;PWD=readonly;PORT=5432;Database=future_info";
-        let res = load_tradingdays_from_odbc(conn, query)?;
-
-        for td in res.iter() {
-            println!("{:?}", td);
-        }
-        Ok(())
-    }
-}

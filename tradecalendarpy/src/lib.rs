@@ -14,17 +14,19 @@ fn to_pyerr(e: anyhow::Error) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyException, _>(e.to_string())
 }
 
+/// make struct and field public for other project using
+///
+/// like hotselectpy crate
 #[gen_stub_pyclass]
 #[pyclass]
-#[allow(dead_code)]
-struct TradeCalendar {
-    entity: tradecalendar::TradeCalendar,
+pub struct TradeCalendar {
+    pub entity: tradecalendar::TradeCalendar,
 }
 
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (start_date=None))]
-fn get_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
+pub fn get_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
     tradecalendar::get_buildin_calendar(start_date)
         .and_then(|r| Ok(TradeCalendar { entity: r }))
         .map_err(to_pyerr)
@@ -33,7 +35,7 @@ fn get_buildin_calendar(start_date: Option<NaiveDate>) -> PyResult<TradeCalendar
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (csv_file, start_date=None))]
-fn get_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
+pub fn get_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<TradeCalendar> {
     tradecalendar::get_csv_calendar(csv_file, start_date)
         .and_then(|r| Ok(TradeCalendar { entity: r }))
         .map_err(to_pyerr)
@@ -55,7 +57,7 @@ fn get_csv_calendar(csv_file: &str, start_date: Option<NaiveDate>) -> PyResult<T
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (db_conn, query, csv_file=None, start_date=None))]
-fn get_calendar(
+pub fn get_calendar(
     db_conn: &str,
     query: &str,
     csv_file: Option<String>,

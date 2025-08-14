@@ -2,14 +2,15 @@ mod db_clickhouse;
 mod db_odbc;
 mod db_sqlx;
 pub mod jcswitch;
+mod tests;
 mod tradecalendar;
 
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
-use db_clickhouse::load_tradingdays_from_clickhouse;
-use db_odbc::load_tradingdays_from_odbc;
-use db_sqlx::load_tradingdays_from_sqlx;
+pub use db_clickhouse::load_tradingdays_from_clickhouse;
+pub use db_odbc::load_tradingdays_from_odbc;
+pub use db_sqlx::load_tradingdays_from_sqlx;
 use jcswitch::{MyDateType, get_now};
 
 pub use tradecalendar::*;

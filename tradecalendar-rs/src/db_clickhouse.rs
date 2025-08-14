@@ -70,20 +70,3 @@ pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<T
     return Ok(res);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn read_clickhouse() -> Result<()> {
-        let query = "SELECT date,morning,trading,night,next FROM futuredb.calendar WHERE date>'2024-01-01' ORDER BY date limit 10";
-
-        let conn = "clickhouse://readonly:readonly@192.168.9.122:8123/futuredb";
-        let res = load_tradingdays_from_clickhouse(conn, query)?;
-
-        for td in res.iter() {
-            println!("{:?}", td);
-        }
-        Ok(())
-    }
-}

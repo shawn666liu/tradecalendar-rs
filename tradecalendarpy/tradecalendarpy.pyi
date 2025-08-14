@@ -5,6 +5,11 @@ import datetime
 import typing
 
 class TradeCalendar:
+    r"""
+    make struct and field public for other project using
+    
+    like hotselectpy crate
+    """
     def reload(self, db_conn,query,csv_file = ...,start_date = ...) -> None:
         r"""
         连接字符串：   

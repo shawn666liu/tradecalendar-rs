@@ -46,21 +46,3 @@ pub fn load_tradingdays_from_sqlx(conn_string: &str, query: &str) -> Result<Vec<
         ));
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn read_sqlx() -> Result<()> {
-        let query = "SELECT date,morning,trading,night,next FROM calendar WHERE date>='2024-01-01' ORDER BY date limit 10";
-
-        let conn = "postgres://readonly:readonly@192.168.9.122:5432/future_info";
-        let res = load_tradingdays_from_sqlx(conn, query)?;
-
-        for td in res.iter() {
-            println!("{:?}", td);
-        }
-        Ok(())
-    }
-}
