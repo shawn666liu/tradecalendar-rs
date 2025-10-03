@@ -167,7 +167,7 @@ impl TradeCalendarPP {
     }
 }
 
-#[cxx::bridge(namespace = "tradecalendarpp")]
+#[cxx::bridge(namespace = "rustpp")]
 mod ffi {
     struct TradingDayPP {
         date: i32,
