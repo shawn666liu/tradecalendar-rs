@@ -10,42 +10,52 @@ use crate::jcswitch::date_from_days_since_epoch;
 #[derive(Row, Deserialize)]
 struct TradingDayRow {
     pub date: u16,
-    pub morning: bool,
-    pub trading: bool,
-    pub night: bool,
+    pub morning: i8,
+    pub trading: i8,
+    pub night: i8,
     pub next: u16,
 }
 
 fn to_tradingday(td: &TradingDayRow) -> Tradingday {
     Tradingday {
         date: date_from_days_since_epoch(td.date as i32),
-        morning: td.morning,
-        trading: td.trading,
-        night: td.night,
+        morning: td.morning > 0,
+        trading: td.trading > 0,
+        night: td.night > 0,
         next: date_from_days_since_epoch(td.next as i32),
     }
 }
 
 /// load trading days from clickhouse database
 ///
-/// conn -> clickhouse://user:passwd@localhost:8123/dbname
+/// conn -> clickhouse://user:passwd@localhost:8123/dbname?connect_timeout=45&receive_timeout=300
 /// http client, so port must be 8123
 /// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'yyyy-mm-dd' ORDER BY date"
 /// https://github.com/ClickHouse/clickhouse-rs
 pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<Tradingday>> {
-    // conn -> user:passwd@localhost:8123/dbname
+    // conn -> user:passwd@localhost:8123/dbname?connect_timeout=45&receive_timeout=300
     let connvec = conn
         .split("://")
         .last()
         .and_then(|s| Some(s.split('@').collect::<Vec<&str>>()))
         .ok_or_else(|| anyhow!("parse connection string failed"))?;
-    // url_db -> ["localhost:8123", "dbname"]
-    let url_db = connvec
+    // connvec -> ["user:passwd", "localhost:8123/dbname?connect_timeout=45&receive_timeout=300"]
+    let hostport_options = connvec
         .last()
+        .and_then(|s| Some(s.split('?').collect::<Vec<&str>>()))
+        .ok_or_else(|| anyhow!("connection string has no host and database"))?;
+    // hostport_options -> ["localhost:8123/dbname", "connect_timeout=45&receive_timeout=300"]
+
+    let url_db = hostport_options
+        .first()
         .and_then(|s| Some(s.split("/").collect::<Vec<&str>>()))
         .ok_or_else(|| anyhow!("connection string has no url"))?;
+    // url_db -> ["localhost:8123", "dbname"]
     if url_db.len() != 2 {
-        return Err(anyhow!("bad format for db url and database"));
+        return Err(anyhow!(format!(
+            "bad format for db url and database, `{}`",
+            hostport_options[0]
+        )));
     }
 
     let rt = tokio::runtime::Runtime::new()?;
@@ -58,10 +68,27 @@ pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<T
             // may has user and password
             let up: Vec<_> = connvec[0].split(':').collect();
             if up.len() != 2 {
-                return Err(anyhow!("bad format for db user and passwd"));
+                return Err(anyhow!(format!(
+                    "bad format for db user and passwd, `{}`",
+                    connvec[0]
+                )));
             }
             client = client.with_user(up[0]).with_password(up[1]);
         }
+        if hostport_options.len() > 1 {
+            // may has parameters
+            let options: Vec<_> = hostport_options[1].split('&').collect();
+            for opt in options {
+                let kv: Vec<_> = opt.split('=').collect();
+                if kv.len() != 2 {
+                    return Err(anyhow!(format!(
+                        "bad format for db connection options, `{opt}`"
+                    )));
+                }
+                client = client.with_option(kv[0], kv[1]);
+            }
+        }
+
         let rows = client.query(query).fetch_all::<TradingDayRow>().await?;
         let result: Vec<_> = rows.iter().map(to_tradingday).collect();
         Ok(result)
@@ -69,4 +96,3 @@ pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<T
 
     return Ok(res);
 }
-

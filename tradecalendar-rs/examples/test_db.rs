@@ -20,7 +20,7 @@ mod tests {
     fn read_clickhouse() -> Result<()> {
         let query = "SELECT date,morning,trading,night,next FROM futuredb.calendar WHERE date>'2024-01-01' ORDER BY date limit 10";
 
-        let conn = "clickhouse://readonly:readonly@192.168.9.122:8123/futuredb";
+        let conn = "clickhouse://readonly:readonly@192.168.9.122:8123/futuredb?connect_timeout=45&receive_timeout=300";
         let res = load_tradingdays_from_clickhouse(conn, query)?;
 
         for td in res.iter() {
@@ -33,7 +33,7 @@ mod tests {
     fn read_sqlx() -> Result<()> {
         let query = "SELECT date,morning,trading,night,next FROM calendar WHERE date>='2024-01-01' ORDER BY date limit 10";
 
-        let conn = "postgres://readonly:readonly@192.168.9.122:5432/future_info";
+        let conn = "postgres://readonly:readonly@192.168.9.122:5432/future_info?connect_timeout=45";
         let res = load_tradingdays_from_sqlx(conn, query)?;
 
         for td in res.iter() {

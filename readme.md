@@ -48,7 +48,7 @@
 支持postgres, mysql, odbc, clickhouse, 连接字符串如下:  
 1. `postgres://user:passwd@localhost:5432/dbname`
 2. `mysql://user:passwd@localhost:3306/dbname`
-3. `clickhouse://user:passwd@localhost:8123/dbname`
+3. `clickhouse://user:passwd@localhost:8123/dbname?connect_timeout=45`
 4. odbc: `Driver={PostgreSQL Unicode};Server=localhost;PORT=5432;UID=user;PWD=passwd;Database=dbname`
 
 - query: 5 fields required, keep the order of fields,
