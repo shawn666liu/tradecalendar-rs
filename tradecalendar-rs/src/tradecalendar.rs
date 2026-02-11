@@ -512,6 +512,20 @@ impl Default for TradingCheckConfig {
     }
 }
 
+impl Display for TradingCheckConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "tday_shift {}, night_begin {}, night_end {}, day_begin {}, day_end {}",
+            self.tday_shift.format("%R"),
+            self.night_begin.format("%R"),
+            self.night_end.format("%R"),
+            self.day_begin.format("%R"),
+            self.day_end.format("%R")
+        )
+    }
+}
+
 /// 内部是有状态的，维护着当前自然日，交易日等信息
 /// 如果交易日当天有夜盘，则self.cfg._night_begin作为下一个TradingDay的开始
 /// 如果交易日当天没有夜盘，则夜里23:59:59之后的0点作为下一个TradingDay的开始
