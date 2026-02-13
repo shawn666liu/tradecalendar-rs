@@ -34,7 +34,7 @@ fn get_calendar(
     } else {
         Some(csv_file)
     };
-    tradecalendar::get_calendar(&db_conn, &query, csv_file, Some(start_date))
+    tradecalendar::get_calendar(&db_conn, &query, csv_file, Some(start_date), None)
         .and_then(|r| Ok(Box::new(TradeCalendarPP { entity: r })))
 }
 
@@ -58,6 +58,7 @@ impl TradeCalendarPP {
             &query,
             csv_file,
             Some(start_date),
+            None,
         )
     }
 

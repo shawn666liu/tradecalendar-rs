@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use clickhouse::Client;
 use clickhouse::Row;
 use serde::Deserialize;
+use tokio::runtime::Handle;
 
 use crate::Tradingday;
 use crate::jcswitch::date_from_days_since_epoch;
@@ -32,7 +33,21 @@ fn to_tradingday(td: &TradingDayRow) -> Tradingday {
 /// http client, so port must be 8123
 /// query -> "SELECT ?fields FROM futuredb.calendar WHERE date>'yyyy-mm-dd' ORDER BY date"
 /// https://github.com/ClickHouse/clickhouse-rs
-pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<Tradingday>> {
+pub fn load_tradingdays_from_clickhouse(
+    conn: &str,
+    query: &str,
+    handle: Option<&Handle>,
+) -> Result<Vec<Tradingday>> {
+    match handle {
+        Some(h) => h.block_on(async { fetch_tradingdays(conn, query).await }),
+        None => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(async { fetch_tradingdays(conn, query).await })
+        }
+    }
+}
+
+async fn fetch_tradingdays(conn: &str, query: &str) -> Result<Vec<Tradingday>> {
     // conn -> user:passwd@localhost:8123/dbname?connect_timeout=45&receive_timeout=300
     let connvec = conn
         .split("://")
@@ -58,41 +73,35 @@ pub fn load_tradingdays_from_clickhouse(conn: &str, query: &str) -> Result<Vec<T
         )));
     }
 
-    let rt = tokio::runtime::Runtime::new()?;
-
-    let res = rt.block_on(async {
-        let mut client = Client::default()
-            .with_url(format!("http://{}", url_db[0]))
-            .with_database(url_db[1]);
-        if connvec.len() > 1 {
-            // may has user and password
-            let up: Vec<_> = connvec[0].split(':').collect();
-            if up.len() != 2 {
+    let mut client = Client::default()
+        .with_url(format!("http://{}", url_db[0]))
+        .with_database(url_db[1]);
+    if connvec.len() > 1 {
+        // may has user and password
+        let up: Vec<_> = connvec[0].split(':').collect();
+        if up.len() != 2 {
+            return Err(anyhow!(format!(
+                "bad format for db user and passwd, `{}`",
+                connvec[0]
+            )));
+        }
+        client = client.with_user(up[0]).with_password(up[1]);
+    }
+    if hostport_options.len() > 1 {
+        // may has parameters
+        let options: Vec<_> = hostport_options[1].split('&').collect();
+        for opt in options {
+            let kv: Vec<_> = opt.split('=').collect();
+            if kv.len() != 2 {
                 return Err(anyhow!(format!(
-                    "bad format for db user and passwd, `{}`",
-                    connvec[0]
+                    "bad format for db connection options, `{opt}`"
                 )));
             }
-            client = client.with_user(up[0]).with_password(up[1]);
+            client = client.with_option(kv[0], kv[1]);
         }
-        if hostport_options.len() > 1 {
-            // may has parameters
-            let options: Vec<_> = hostport_options[1].split('&').collect();
-            for opt in options {
-                let kv: Vec<_> = opt.split('=').collect();
-                if kv.len() != 2 {
-                    return Err(anyhow!(format!(
-                        "bad format for db connection options, `{opt}`"
-                    )));
-                }
-                client = client.with_option(kv[0], kv[1]);
-            }
-        }
+    }
 
-        let rows = client.query(query).fetch_all::<TradingDayRow>().await?;
-        let result: Vec<_> = rows.iter().map(to_tradingday).collect();
-        Ok(result)
-    })?;
-
-    return Ok(res);
+    let rows = client.query(query).fetch_all::<TradingDayRow>().await?;
+    let result: Vec<_> = rows.iter().map(to_tradingday).collect();
+    Ok(result)
 }

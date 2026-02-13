@@ -7,6 +7,7 @@ mod tradecalendar;
 
 use anyhow::{Result, anyhow};
 use std::path::Path;
+use tokio::runtime::Handle;
 
 pub use db_clickhouse::load_tradingdays_from_clickhouse;
 pub use db_odbc::load_tradingdays_from_odbc;
@@ -40,6 +41,7 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
     db_conn: &str,
     query: &str,
     csv_file: Option<P>,
+    tokio_handle: Option<&Handle>,
 ) -> Result<Vec<Tradingday>> {
     // 内部函数
     fn _find_latest_(
@@ -64,7 +66,7 @@ pub fn load_latest_tradingdays<P: AsRef<Path>>(
             },
         }
     }
-    let res1 = match load_tradingdays_from_db(db_conn, query) {
+    let res1 = match load_tradingdays_from_db(db_conn, query, tokio_handle) {
         Ok(r) => {
             println!(
                 "==> {}, load_tradingdays_from_db() count {}, first {:?}, last {:?}",
@@ -125,8 +127,12 @@ pub fn get_csv_calendar<P: AsRef<Path>>(
 }
 
 /// 从数据库加载交易日并创建TradeCalendar对象
-pub fn get_db_calendar(db_conn: &str, query: &str) -> Result<TradeCalendar> {
-    let full_list = load_tradingdays_from_db(db_conn, query)?;
+pub fn get_db_calendar(
+    db_conn: &str,
+    query: &str,
+    tokio_handle: Option<&Handle>,
+) -> Result<TradeCalendar> {
+    let full_list = load_tradingdays_from_db(db_conn, query, tokio_handle)?;
     let mut calendar = TradeCalendar::new();
     calendar.reload(full_list)?;
     Ok(calendar)
@@ -138,8 +144,9 @@ pub fn get_calendar<P: AsRef<Path>>(
     query: &str,
     csv_file: Option<P>,
     start_date: Option<MyDateType>,
+    tokio_handle: Option<&Handle>,
 ) -> Result<TradeCalendar> {
-    let mut vec = load_latest_tradingdays(db_conn, query, csv_file)?;
+    let mut vec = load_latest_tradingdays(db_conn, query, csv_file, tokio_handle)?;
     if vec.is_empty() {
         return Err(anyhow!("tradingday list is empty"));
     }
@@ -163,8 +170,9 @@ pub fn reload_calendar<P: AsRef<Path>>(
     query: &str,
     csv_file: Option<P>,
     start_date: Option<MyDateType>,
+    tokio_handle: Option<&Handle>,
 ) -> Result<()> {
-    let mut vec = load_latest_tradingdays(db_conn, query, csv_file)?;
+    let mut vec = load_latest_tradingdays(db_conn, query, csv_file, tokio_handle)?;
     if vec.is_empty() {
         return Err(anyhow!("tradingday list is empty"));
     }
@@ -188,13 +196,17 @@ pub fn reload_calendar<P: AsRef<Path>>(
 ///
 /// query: 5 fields required, keep the order of feilds,
 /// select date,morning,trading,night,next from your_table where date>='yyyy-mm-dd' order by date
-pub fn load_tradingdays_from_db(conn: &str, query: &str) -> Result<Vec<Tradingday>> {
+pub fn load_tradingdays_from_db(
+    conn: &str,
+    query: &str,
+    tokio_handle: Option<&Handle>,
+) -> Result<Vec<Tradingday>> {
     if conn.is_empty() || query.is_empty() {
         return Err(anyhow!("connection string or query is empty"));
     }
     let lower = conn.to_lowercase();
     if lower.starts_with("clickhouse://") {
-        return load_tradingdays_from_clickhouse(conn, query);
+        return load_tradingdays_from_clickhouse(conn, query, tokio_handle);
     } else if lower.starts_with("mysql") || lower.starts_with("postgres") {
         return load_tradingdays_from_sqlx(conn, query);
     } else {

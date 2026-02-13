@@ -63,7 +63,7 @@ pub fn get_calendar(
     csv_file: Option<String>,
     start_date: Option<NaiveDate>,
 ) -> PyResult<TradeCalendar> {
-    tradecalendar::get_calendar(db_conn, query, csv_file, start_date)
+    tradecalendar::get_calendar(db_conn, query, csv_file, start_date, None)
         .and_then(|r| Ok(TradeCalendar { entity: r }))
         .map_err(to_pyerr)
 }
@@ -92,7 +92,8 @@ impl TradeCalendar {
         csv_file: Option<String>,
         start_date: Option<NaiveDate>,
     ) -> PyResult<()> {
-        reload_calendar(&mut self.entity, db_conn, query, csv_file, start_date).map_err(to_pyerr)
+        reload_calendar(&mut self.entity, db_conn, query, csv_file, start_date, None)
+            .map_err(to_pyerr)
     }
 
     fn is_trading_day(&self, date: NaiveDate) -> PyResult<bool> {
