@@ -40,10 +40,13 @@ pub fn load_tradingdays_from_clickhouse(
 ) -> Result<Vec<Tradingday>> {
     match handle {
         Some(h) => h.block_on(async { fetch_tradingdays(conn, query).await }),
-        None => {
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(async { fetch_tradingdays(conn, query).await })
-        }
+        None => match &Handle::try_current() {
+            Ok(h) => h.block_on(async { fetch_tradingdays(conn, query).await }),
+            Err(_) => {
+                let rt = tokio::runtime::Runtime::new()?;
+                rt.block_on(async { fetch_tradingdays(conn, query).await })
+            }
+        },
     }
 }
 
