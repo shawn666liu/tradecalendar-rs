@@ -39,10 +39,17 @@ pub fn load_tradingdays_from_clickhouse(
     handle: Option<&Handle>,
 ) -> Result<Vec<Tradingday>> {
     match handle {
-        Some(h) => h.block_on(async { fetch_tradingdays(conn, query).await }),
+        Some(h) => {
+            println!("input handle is not None");
+            h.block_on(async { fetch_tradingdays(conn, query).await })
+        }
         None => match &Handle::try_current() {
-            Ok(h) => h.block_on(async { fetch_tradingdays(conn, query).await }),
+            Ok(h) => {
+                println!("Handle::try_current() is not None");
+                h.block_on(async { fetch_tradingdays(conn, query).await })
+            }
             Err(_) => {
+                println!("create new runtime");
                 let rt = tokio::runtime::Runtime::new()?;
                 rt.block_on(async { fetch_tradingdays(conn, query).await })
             }
