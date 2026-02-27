@@ -46,3 +46,31 @@ pub fn load_tradingdays_from_sqlx(conn_string: &str, query: &str) -> Result<Vec<
         ));
     }
 }
+
+pub async fn load_tradingdays_from_sqlx_async(conn_string: &str, query: &str) -> Result<Vec<Tradingday>> {
+    let lower = conn_string.to_lowercase();
+    if lower.starts_with("postgres") {
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect(conn_string)
+            .await?;
+        let trading_days: Vec<Tradingday> = sqlx::query_as::<_, Tradingday>(query)
+            .fetch_all(&pool)
+            .await?;
+        return Ok(trading_days);
+    } else if lower.starts_with("mysql") {
+        let pool = MySqlPoolOptions::new()
+            .max_connections(1)
+            .connect(conn_string)
+            .await?;
+        let trading_days: Vec<Tradingday> = sqlx::query_as::<_, Tradingday>(query)
+            .fetch_all(&pool)
+            .await?;
+        return Ok(trading_days);
+    } else {
+        return Err(anyhow!(
+            "unsupported connection string for sqlx: {}",
+            conn_string
+        ));
+    }
+}

@@ -10,7 +10,7 @@ use std::path::Path;
 
 pub use db_clickhouse::{load_tradingdays_from_clickhouse, load_tradingdays_from_clickhouse_async};
 pub use db_odbc::load_tradingdays_from_odbc;
-pub use db_sqlx::load_tradingdays_from_sqlx;
+pub use db_sqlx::*;
 use jcswitch::{MyDateType, get_now};
 
 pub use tradecalendar::*;
@@ -85,7 +85,7 @@ pub fn get_csv_calendar<P: AsRef<Path>>(
 ///////////////////////////////////////////////////////////////////////////////
 
 /// load Tradingday from db
-/// conn format:  
+/// conn format:
 /// 1) postgres://user:passwd@localhost:5432/dbname
 /// 2) mysql://user:passwd@localhost:3306/dbname
 /// 3) clickhouse://user:passwd@localhost:8123/dbname
@@ -210,7 +210,7 @@ pub fn reload_calendar<P: AsRef<Path>>(
 ////////////////////////////////////////////////////////////////////////////////////////
 
 /// load Tradingday from db
-/// conn format:  
+/// conn format:
 /// 1) postgres://user:passwd@localhost:5432/dbname
 /// 2) mysql://user:passwd@localhost:3306/dbname
 /// 3) clickhouse://user:passwd@localhost:8123/dbname
@@ -226,7 +226,7 @@ pub async fn load_tradingdays_from_db_async(conn: &str, query: &str) -> Result<V
     if lower.starts_with("clickhouse://") {
         return load_tradingdays_from_clickhouse_async(conn, query).await;
     } else if lower.starts_with("mysql") || lower.starts_with("postgres") {
-        return load_tradingdays_from_sqlx(conn, query);
+        return load_tradingdays_from_sqlx_async(conn, query).await;
     } else {
         load_tradingdays_from_odbc(conn, query)
     }
