@@ -533,7 +533,7 @@ impl Display for TradingCheckConfig {
 ///
 /// 外部触发trading状态切换、交易日更改的函数为 time_changed()，返回值：tuple(自然日是否改变，交易日是否改变)
 /// 若返回值中含有true, 则有状态改变，调用方可采取相应动作
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TradeCalendar {
     full_day_list: Vec<Tradingday>,
     trading_day_list: Vec<Tradingday>,
@@ -687,7 +687,7 @@ impl TradeCalendar {
     /// fail_safe: 在失败时(主要是calendar没有及时更新的情况)尝试补救?
     ///
     /// 返回值: tuple(上个交易日, 当前交易日, 上个自然日, 当前自然日, Option<Error_Message>)
-    ///    
+    ///
     pub fn time_changed(
         &mut self,
         datetime: &MyDateTimeType,
